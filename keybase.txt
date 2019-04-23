@@ -1,0 +1,56 @@
+==================================================================
+https://keybase.io/kumulo
+--------------------------------------------------------------------
+
+I hereby claim:
+
+  * I am an admin of http://adriacidre.com
+  * I am kumulo (https://keybase.io/kumulo) on keybase.
+  * I have a public key ASBM169TXG0MNhX3RpK19w_OV_RrxIHIE7Rf3CCnfC-qbQo
+
+To do so, I am signing this object:
+
+{
+  "body": {
+    "key": {
+      "eldest_kid": "01204cd7af535c6d0c3615f74692b5f70fce57f46bc481c813b45fdc20a77c2faa6d0a",
+      "host": "keybase.io",
+      "kid": "01204cd7af535c6d0c3615f74692b5f70fce57f46bc481c813b45fdc20a77c2faa6d0a",
+      "uid": "d61e1ab93c10798893f2e344f3ddc119",
+      "username": "kumulo"
+    },
+    "merkle_root": {
+      "ctime": 1556012192,
+      "hash": "b4033cd66703e35dbcfa171097689476b799a5949fee5ccafa8e70eb31df459781688fe02b57676a045da09ea84f946f86f58cf65d2eed3f5f87bac1e77e7ac8",
+      "hash_meta": "977b10cd424ec0db25bbbff620e4b2870af6b20d836c7ff2f7a0c3072cb9b038",
+      "seqno": 5223681
+    },
+    "service": {
+      "entropy": "j8+96n5pTTtwgWgWF2n7T4dV",
+      "hostname": "adriacidre.com",
+      "protocol": "http:"
+    },
+    "type": "web_service_binding",
+    "version": 2
+  },
+  "client": {
+    "name": "keybase.io go client",
+    "version": "3.2.2"
+  },
+  "ctime": 1556012291,
+  "expire_in": 504576000,
+  "prev": "0b71d4dff9ec1d0c9e82a34d230a089444c947d30a917da68937f2b3a80f54f7",
+  "seqno": 11,
+  "tag": "signature"
+}
+
+which yields the signature:
+
+hKRib2R5hqhkZXRhY2hlZMOpaGFzaF90eXBlCqNrZXnEIwEgTNevU1xtDDYV90aStfcPzlf0a8SByBO0X9wgp3wvqm0Kp3BheWxvYWTESpcCC8QgC3HU3/nsHQyegqNNIwoIlETJR9MKkX2miTfys6gPVPfEIOfWGktQtIpUd6hiCWeEZ+2Ye8iqUKNqSRPcT8iLr+lyAgHCo3NpZ8RAAC5B/uWMH6Azkgv5rEUo6FytF3pdC02ubi4KQpJ3OtPJ+K+6M022KLjcBYjMOp2KDPFGKbjTqDh0jvw2UO7uAahzaWdfdHlwZSCkaGFzaIKkdHlwZQildmFsdWXEID9F3TpNGIZXG9IJDvMFIKWcO/eDQlBt9sjCnsfBRdiNo3RhZ80CAqd2ZXJzaW9uAQ==
+
+And finally, I am proving ownership of this host by posting or
+appending to this document.
+
+View my publicly-auditable identity here: https://keybase.io/kumulo
+
+==================================================================
