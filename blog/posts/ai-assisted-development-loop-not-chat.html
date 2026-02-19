@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI-Assisted Development: A Loop, Not a Chat &mdash; Adri&agrave; Cidre</title>
+  <meta name="description" content="The bottleneck isn't the AI — it's me. Three slash commands that form a loop: Plan, Work, QA. How structured phases made AI development manageable.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://adriacidre.com/blog/posts/ai-assisted-development-loop-not-chat.html">
+  <meta property="og:title" content="AI-Assisted Development: A Loop, Not a Chat">
+  <meta property="og:description" content="The bottleneck isn't the AI — it's me. Three slash commands that form a loop: Plan, Work, QA. How structured phases made AI development manageable.">
+  <meta property="og:image" content="https://adriacidre.com/blog/images/og-default.jpg">
+  <meta property="og:site_name" content="Adri&agrave; Cidre">
+  <meta property="article:published_time" content="2026-02-18">
+  <meta property="article:author" content="Adri&agrave; Cidre">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="AI-Assisted Development: A Loop, Not a Chat">
+  <meta name="twitter:description" content="The bottleneck isn't the AI — it's me. Three slash commands that form a loop: Plan, Work, QA. How structured phases made AI development manageable.">
+  <meta name="twitter:image" content="https://adriacidre.com/blog/images/og-default.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;600&family=Source+Code+Pro:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="../css/blog.css">
+</head>
+<body>
+  <div class="blog-wrapper">
+    <div class="blog-card">
+      <header class="blog-header">
+        <div class="blog-header-name"><a href="/">Adri&agrave; Cidre</a></div>
+        <nav>
+          <ul class="blog-header-nav">
+            <li><a href="/">Home</a></li>
+            <li><a href="/blog/">Blog</a></li>
+          </ul>
+        </nav>
+      </header>
+
+      <div class="blog-content">
+        <div class="post-meta">
+          <span class="post-meta-date">February 18, 2026</span>
+          <span class="post-meta-series">AI Development Workflow &mdash; Part 1 of 5</span>
+          <div class="post-meta-tags">
+            <span class="post-meta-tag">ai</span>
+            <span class="post-meta-tag">claude-code</span>
+            <span class="post-meta-tag">development-workflow</span>
+            <span class="post-meta-tag">automation</span>
+            <span class="post-meta-tag">linear</span>
+          </div>
+        </div>
+
+        <div class="series-nav">
+          <div class="series-nav-title">AI Development Workflow &mdash; 5-Part Series</div>
+          <ol class="series-nav-list">
+            <li><span class="current">AI-Assisted Development: A Loop, Not a Chat</span></li>
+            <li><span class="upcoming">/plan-issue: Collaborative Planning with AI</span></li>
+            <li><span class="upcoming">/work-issue: Autonomous Implementation</span></li>
+            <li><span class="upcoming">/qa-run: AI-Driven QA That Closes the Loop</span></li>
+            <li><span class="upcoming">Specialist Agents: Looking at Every Page with Different Eyes</span></li>
+          </ol>
+        </div>
+
+        <h1>AI-Assisted Development: A Loop, Not a Chat</h1>
+
+        <p>I&rsquo;ve been building a production app (<a href="https://brot.health">brot.health</a>, Go + React) with Claude Code for the past few months. Along the way I&rsquo;ve hit the same wall that I think most people hit with AI-assisted development: the bottleneck isn&rsquo;t the AI &mdash; it&rsquo;s me.</p>
+
+        <p>I need to explain context, review output, catch hallucinations, verify behavior, and file new work. The AI writes code fast, but only if I do the work of feeding it the right inputs and validating the right outputs. That overhead was eating all the time I thought I was saving.</p>
+
+        <p>So I built a workflow around it. Three slash commands that form a loop. This is what works for me &mdash; your mileage may vary, and it&rsquo;s definitely not the only way. But it&rsquo;s made AI development manageable for my project and my team size (one, plus the AI).</p>
+
+        <h2>The problem with working inline</h2>
+
+        <p>My early approach was entirely inline &mdash; I&rsquo;d open Claude Code, describe what I wanted, let it write and edit files directly, fix what didn&rsquo;t work, ask for more changes, fix more things. It works for small things. It fell apart once the project grew.</p>
+
+        <p>The issues I kept running into:</p>
+
+        <ul>
+          <li><strong>Context drift.</strong> The AI forgets what it was doing. I re-explain the same architecture decisions.</li>
+          <li><strong>Scope creep.</strong> A &ldquo;simple feature&rdquo; touches 8 files across backend, frontend, and database. The AI doesn&rsquo;t know where to stop.</li>
+          <li><strong>No verification.</strong> I eyeball the output and ship it. Bugs pile up.</li>
+          <li><strong>No feedback loop.</strong> QA findings live in my head. They never become structured work items that the AI can pick up later.</li>
+        </ul>
+
+        <h2>The loop: Plan, Work, QA</h2>
+
+        <p>I use <a href="https://linear.app">Linear</a> as my issue tracker. Issues flow through statuses: Backlog (ideas) &rarr; Todo (planned, ready to implement) &rarr; In Progress (being worked on) &rarr; Done.</p>
+
+        <p>The three Claude Code slash commands map to transitions in this lifecycle:</p>
+
+<pre><code class="language-plaintext">/plan-issue  &rarr;  /work-issue  &rarr;  /qa-run
+     &uarr;                              |
+     &larr;&mdash;&mdash; new issues from QA &mdash;&mdash;&mdash;&rsquo;
+</code></pre>
+
+        <p>Each phase has a clear input, a clear output, and a clear handoff:</p>
+
+        <ol>
+          <li><strong><code>/plan-issue</code></strong> &mdash; I sit with the AI and refine a vague idea into a concrete, implementable spec. This is collaborative &mdash; the AI explores the codebase, I make decisions. The output is a Linear issue (moved to Todo) with acceptance criteria, technical approach, and testing strategy. No code is written.</li>
+          <li><strong><code>/work-issue</code></strong> &mdash; The AI picks up a Todo issue from Linear and implements it autonomously. It reads the spec, writes code following existing patterns, writes tests, runs linting, self-reviews, commits, and marks the Linear issue Done. I&rsquo;m not involved. One issue at a time, fresh context each time.</li>
+          <li><strong><code>/qa-run</code></strong> &mdash; The AI drives a real browser through predefined user journeys, evaluating every step with specialist sub-agents (functional QA, UX, security, performance). Findings get structured into reports. Blockers and bugs become new Linear issues, which feed back into <code>/plan-issue</code>.</li>
+        </ol>
+
+        <h2>The docs folder: giving the AI a memory</h2>
+
+        <p>One thing that makes this work is a <code>docs/</code> folder in the project root with architecture documentation that the AI reads during both planning and implementation:</p>
+
+<pre><code class="language-plaintext">docs/
+  architecture/
+    platform-overview.md    # System design, service boundaries
+    tech-stack.md           # Stack conventions, library choices
+    data-model.md           # Database schema, relationships
+  features/                 # Feature-specific docs
+  workflow/                 # Business process docs
+  api/                      # API surface docs
+</code></pre>
+
+        <p>The AI reads these docs at the start of every <code>/plan-issue</code> and <code>/work-issue</code> run. This gives it persistent architectural context without me re-explaining things each time.</p>
+
+        <p>Keeping these docs current is part of the workflow &mdash; <code>/plan-issue</code> checks if the planned work would change the architecture or data model, and asks me if I want to update the docs. It&rsquo;s a bit of extra work, but it means the next run doesn&rsquo;t start with stale info.</p>
+
+        <h2>Why this works for me</h2>
+
+        <p><strong>Each piece only needs to know about its own thing.</strong> The AI doesn&rsquo;t need to hold the entire project in its head. <code>/plan-issue</code> only needs the issue and the relevant code. <code>/work-issue</code> gets a spec with file paths and acceptance criteria. <code>/qa-run</code> follows journey steps and checks what it sees.</p>
+
+        <p><strong>I only show up where it matters.</strong> Planning is where I make product decisions, answer questions, decide scope. Implementation follows patterns. QA follows checklists. I spend my time on the parts where thinking is needed.</p>
+
+        <p><strong>QA findings go back into the issue tracker.</strong> They&rsquo;re not notes in my head &mdash; they&rsquo;re reports with severity levels and evidence. I can turn a <code>[WARNING] Analytics patterns page has 6 failing API endpoints</code> into a Linear issue in minutes. That issue goes through <code>/plan-issue</code>, gets picked up by <code>/work-issue</code>, and the next <code>/qa-run</code> checks if it&rsquo;s fixed.</p>
+
+        <p><strong>Headless batch mode.</strong> <code>/work-issue</code> works fine interactively, but the nice thing is you can also run it headless with <code>claude -p</code>. There&rsquo;s a shell script that processes multiple issues one after the other, each in a fresh context:</p>
+
+<pre><code class="language-bash">./scripts/work-linear-issues.sh -n 10 --stop-on-error
+</code></pre>
+
+        <p>Each issue gets its own context window, its own commit, its own Linear update. I get push notifications via <a href="https://ntfy.sh">ntfy</a> on my phone as each issue completes.</p>
+
+        <h2>My actual daily rhythm</h2>
+
+        <p>My workflow has settled into a natural cycle:</p>
+
+        <ul>
+          <li><strong>Afternoon:</strong> I run <code>/plan-issue</code> on 5-10 issues. This is the collaborative part &mdash; I&rsquo;m making product decisions, answering questions, scoping work. Takes maybe an hour.</li>
+          <li><strong>Evening:</strong> I kick off the batch script and close my laptop. The issues process overnight, one by one, each in a fresh context.</li>
+          <li><strong>Morning:</strong> I review the commits, check the Linear updates, and run <code>/qa-run</code> on the relevant journeys. QA findings become new issues in Backlog. The laptop has been working while I slept.</li>
+        </ul>
+
+        <p>My laptop basically runs all day. It processes issues overnight and runs QA in the morning while I go through the commits. I still review everything. I still make every product decision. But instead of writing all the code myself, I plan 8 issues in an afternoon, go to sleep, and wake up with 6-7 of them done. The ones that failed, I re-plan with more detail.</p>
+
+        <h2>What this doesn&rsquo;t solve</h2>
+
+        <p>I want to be honest about the limitations:</p>
+
+        <ul>
+          <li><strong>It still requires my time.</strong> Planning takes 5-10 minutes per issue. Reviewing commits takes time. Running QA takes time. It&rsquo;s less time than doing everything myself, but it&rsquo;s not zero.</li>
+          <li><strong>The AI still makes mistakes.</strong> Bad implementations happen. Tests sometimes pass for the wrong reasons. Self-review catches some issues but not all. I review every commit in the morning.</li>
+          <li><strong>It works for my project size.</strong> This is a single codebase, single developer, maybe 30k lines. I haven&rsquo;t tried this on a large team or a monorepo.</li>
+          <li><strong>Vague issues produce vague implementations.</strong> Garbage in, garbage out. If I skip planning, autonomous implementation is a coin flip.</li>
+          <li><strong>Not every issue succeeds.</strong> Out of 8 issues overnight, maybe 1-2 fail. They stay In Progress in Linear with a comment explaining what went wrong. I re-plan them with more detail and they usually work on the second pass.</li>
+        </ul>
+
+        <h2>What&rsquo;s next</h2>
+
+        <p>In the next posts, I&rsquo;ll walk through each phase &mdash; how the commands work, what the prompts look like, and the specific patterns I&rsquo;ve found that make each phase more reliable.</p>
+
+        <hr>
+
+        <nav class="post-nav">
+          <span class="post-nav-spacer"></span>
+          <span class="post-nav-spacer"></span>
+        </nav>
+      </div>
+
+      <footer class="blog-footer">
+        <p>&copy; Adri&agrave; Cidre &middot; <a href="/">Home</a></p>
+      </footer>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
