@@ -39,7 +39,7 @@
       <div class="blog-content">
         <div class="post-meta">
           <span class="post-meta-date">February 18, 2026</span>
-          <span class="post-meta-series">AI Development Workflow &mdash; Part 1 of 5</span>
+          <span class="post-meta-series">The AI Development Loop &mdash; Part 1 of 5</span>
           <div class="post-meta-tags">
             <span class="post-meta-tag">ai</span>
             <span class="post-meta-tag">claude-code</span>
@@ -50,7 +50,7 @@
         </div>
 
         <div class="series-nav">
-          <div class="series-nav-title">AI Development Workflow &mdash; 5-Part Series</div>
+          <div class="series-nav-title">The AI Development Loop &mdash; 5-Part Series</div>
           <ol class="series-nav-list">
             <li><span class="current">AI-Assisted Development: A Loop, Not a Chat</span></li>
             <li><span class="upcoming">/plan-issue: Collaborative Planning with AI</span></li>
@@ -62,7 +62,7 @@
 
         <h1>AI-Assisted Development: A Loop, Not a Chat</h1>
 
-        <p>I&rsquo;ve been building a production app (<a href="https://brot.health">brot.health</a>, Go + React) with Claude Code for the past few months. Along the way I&rsquo;ve hit the same wall that I think most people hit with AI-assisted development: the bottleneck isn&rsquo;t the AI &mdash; it&rsquo;s me.</p>
+        <p>I&rsquo;ve been building a healthcare compliance platform (<a href="https://brot.health">brot.health</a>, Go + React) with Claude Code for the past few months. Along the way I&rsquo;ve hit the same wall that I think most people hit with AI-assisted development: the bottleneck isn&rsquo;t the AI &mdash; it&rsquo;s me.</p>
 
         <p>I need to explain context, review output, catch hallucinations, verify behavior, and file new work. The AI writes code fast, but only if I do the work of feeding it the right inputs and validating the right outputs. That overhead was eating all the time I thought I was saving.</p>
 
@@ -95,7 +95,7 @@
         <ol>
           <li><strong><code>/plan-issue</code></strong> &mdash; I sit with the AI and refine a vague idea into a concrete, implementable spec. This is collaborative &mdash; the AI explores the codebase, I make decisions. The output is a Linear issue (moved to Todo) with acceptance criteria, technical approach, and testing strategy. No code is written.</li>
           <li><strong><code>/work-issue</code></strong> &mdash; The AI picks up a Todo issue from Linear and implements it autonomously. It reads the spec, writes code following existing patterns, writes tests, runs linting, self-reviews, commits, and marks the Linear issue Done. I&rsquo;m not involved. One issue at a time, fresh context each time.</li>
-          <li><strong><code>/qa-run</code></strong> &mdash; The AI drives a real browser through predefined user journeys, evaluating every step with specialist sub-agents (functional QA, UX, security, performance). Findings get structured into reports. Blockers and bugs become new Linear issues, which feed back into <code>/plan-issue</code>.</li>
+          <li><strong><code>/qa-run</code></strong> &mdash; The AI drives a real browser through predefined user journeys. At every step, multiple specialist sub-agents observe the same page in parallel &mdash; one checks functional correctness, another evaluates UX, another probes security, another measures performance. Each brings a different lens to the same screen. Findings get structured into reports with severity levels and evidence. Blockers and bugs become new Linear issues, which feed back into <code>/plan-issue</code>.</li>
         </ol>
 
         <h2>What I learned about giving the AI a memory</h2>
