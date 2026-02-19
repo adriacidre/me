@@ -69,11 +69,11 @@
 
         <p><code>/work-issue</code> works fine interactively, but it gets way more useful in headless mode with <code>claude -p</code>. You can put it on a loop and leave it running overnight. My day now looks like: plan issues in the afternoon, start the batch script in the evening, review commits and run QA in the morning. My laptop is basically always doing something.</p>
 
-        <p>This only works because planning happened first. The spec in the Linear issue tells the AI exactly what to build, which files to touch, what tests to write, and what&rsquo;s out of scope. Without that, autonomous implementation is unreliable. I tried &mdash; it produced code I&rsquo;d have to rewrite anyway.</p>
+        <p>This only works because planning happened first. The spec in the Linear issue tells the AI exactly what to build, which files to touch, what tests to write, and what&rsquo;s out of scope. Without that, autonomous implementation is unreliable. I tried &mdash; it produced code I&rsquo;d have to rewrite anyway. That was probably the most important lesson in this whole process: autonomous doesn&rsquo;t mean unsupervised, it means well-prepared.</p>
 
-        <h2>The 13-step protocol</h2>
+        <h2>What I learned building the protocol</h2>
 
-        <p><code>/work-issue</code> follows a rigid protocol defined in <code>.claude/commands/work-issue.md</code>. Here&rsquo;s what happens:</p>
+        <p><code>/work-issue</code> follows a rigid protocol defined in <code>.claude/commands/work-issue.md</code>. I didn&rsquo;t start with 13 steps &mdash; I started with &ldquo;just implement this issue&rdquo; and kept adding structure every time something went wrong. Each step exists because I learned its absence the hard way.</p>
 
         <h3>1. Pick an issue</h3>
 
@@ -170,7 +170,7 @@ Co-Authored-By: Claude Opus 4.6 &lt;noreply@anthropic.com&gt;
 
         <p>This sends a push notification via <a href="https://ntfy.sh">ntfy</a> to my phone. When I&rsquo;m running batch mode and doing something else entirely, I get a ping for each completed issue. It&rsquo;s the &ldquo;ding&rdquo; that lets me know work is happening in the background.</p>
 
-        <h2>Headless batch mode: the overnight workflow</h2>
+        <h2>The real unlock: headless batch mode</h2>
 
         <p>The batch orchestrator is a shell script that processes multiple issues one after the other. Each issue gets its own headless <code>claude -p</code> call &mdash; fresh context, no leftover state from the previous issue:</p>
 
@@ -274,9 +274,9 @@ brot: Completed BROT-42 — Add review notifications</code></pre>
 
         <p>This matters more than I expected. When the batch runs overnight, waking up to 6-7 notifications means stuff got done while I slept. No notification for an issue means something went wrong &mdash; time to check the logs and re-plan. Simple, but it makes the whole overnight thing feel way less like a black box.</p>
 
-        <h2>Guardrails</h2>
+        <h2>Guardrails I learned to add the hard way</h2>
 
-        <p>The protocol has explicit guardrails:</p>
+        <p>Every guardrail in this list exists because I didn&rsquo;t have it once and something went wrong:</p>
 
         <ul>
           <li><strong>One issue per run.</strong> Never attempt multiple issues in the same context.</li>
@@ -289,7 +289,7 @@ brot: Completed BROT-42 — Add review notifications</code></pre>
 
         <p>These guardrails exist because autonomous means unattended &mdash; and in my case, literally overnight while I&rsquo;m asleep. The cost of the AI making a bad decision at 2am is higher than the cost of it being conservative. I&rsquo;d rather wake up to a failed issue (that I can re-plan) than to a force-pushed branch or a deleted test file.</p>
 
-        <h2>When it works, when it doesn&rsquo;t</h2>
+        <h2>Where I&rsquo;ve seen this succeed and fail</h2>
 
         <p><strong>Works well for:</strong></p>
 
