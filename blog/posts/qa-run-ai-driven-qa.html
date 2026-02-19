@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>/qa-run: AI-Driven QA That Closes the Loop &mdash; Adri&agrave; Cidre</title>
+  <meta name="description" content="Real browser, predefined journeys, specialist agents checking every step. How QA findings feed back into the issue tracker to close the development loop.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://adriacidre.com/blog/posts/qa-run-ai-driven-qa.html">
+  <meta property="og:title" content="/qa-run: AI-Driven QA That Closes the Loop">
+  <meta property="og:description" content="Real browser, predefined journeys, specialist agents checking every step. How QA findings feed back into the issue tracker to close the development loop.">
+  <meta property="og:image" content="https://adriacidre.com/blog/images/og-default.jpg">
+  <meta property="og:site_name" content="Adri&agrave; Cidre">
+  <meta property="article:published_time" content="2026-02-18">
+  <meta property="article:author" content="Adri&agrave; Cidre">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="/qa-run: AI-Driven QA That Closes the Loop">
+  <meta name="twitter:description" content="Real browser, predefined journeys, specialist agents checking every step. How QA findings feed back into the issue tracker to close the development loop.">
+  <meta name="twitter:image" content="https://adriacidre.com/blog/images/og-default.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;600&family=Source+Code+Pro:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="../css/blog.css">
+</head>
+<body>
+  <div class="blog-wrapper">
+    <div class="blog-card">
+      <header class="blog-header">
+        <div class="blog-header-name"><a href="/">Adri&agrave; Cidre</a></div>
+        <nav>
+          <ul class="blog-header-nav">
+            <li><a href="/">Home</a></li>
+            <li><a href="/blog/">Blog</a></li>
+          </ul>
+        </nav>
+      </header>
+
+      <div class="blog-content">
+        <div class="post-meta">
+          <span class="post-meta-date">February 18, 2026</span>
+          <a class="post-meta-series" href="/blog/">AI Development Workflow &mdash; Part 4 of 5</a>
+          <div class="post-meta-tags">
+            <span class="post-meta-tag">ai</span>
+            <span class="post-meta-tag">claude-code</span>
+            <span class="post-meta-tag">qa</span>
+            <span class="post-meta-tag">playwright</span>
+            <span class="post-meta-tag">testing</span>
+            <span class="post-meta-tag">linear</span>
+          </div>
+        </div>
+
+        <div class="series-nav">
+          <div class="series-nav-title">AI Development Workflow &mdash; 5-Part Series</div>
+          <ol class="series-nav-list">
+            <li><a href="/blog/posts/ai-assisted-development-loop-not-chat.html">AI-Assisted Development: A Loop, Not a Chat</a></li>
+            <li><a href="/blog/posts/plan-issue-collaborative-planning.html">/plan-issue: Collaborative Planning with AI</a></li>
+            <li><a href="/blog/posts/work-issue-autonomous-implementation.html">/work-issue: Autonomous Implementation</a></li>
+            <li><span class="current">/qa-run: AI-Driven QA That Closes the Loop</span></li>
+            <li><span class="upcoming">Specialist Agents: Looking at Every Page with Different Eyes</span></li>
+          </ol>
+        </div>
+
+        <h1>/qa-run: AI-Driven QA That Closes the Loop</h1>
+
+        <p>This is Part 4 of my series on AI-assisted development. <a href="/blog/posts/ai-assisted-development-loop-not-chat.html">Part 1</a> covers the loop, <a href="/blog/posts/plan-issue-collaborative-planning.html">Part 2</a> covers planning, <a href="/blog/posts/work-issue-autonomous-implementation.html">Part 3</a> covers implementation.</p>
+
+        <p>After <code>/work-issue</code> commits code, how do I know it actually works? The command runs unit tests and linting, but that doesn&rsquo;t catch what users see &mdash; broken layouts, confusing UX, missing permissions, slow loads, state that doesn&rsquo;t update after an action.</p>
+
+        <p>I built <code>/qa-run</code> for this, and it taught me something I didn&rsquo;t expect: the most valuable thing AI can do for QA isn&rsquo;t finding bugs &mdash; it&rsquo;s looking at the same page from perspectives I wouldn&rsquo;t think to check. It opens a real browser, goes through predefined user journeys, and at each step a bunch of specialist AI agents look at the page and report what they find. Findings go back into Linear as new issues &mdash; which closes the loop.</p>
+
+        <h2>How I set it up</h2>
+
+<pre><code class="language-bash">/qa-run 07                           # Run journey 07 (dashboard navigation)
+/qa-run 01                           # Run journey 01 (full SOP lifecycle)
+/qa-run 03 --specialists=qa,security # Only run QA and security specialists
+/qa-run 07 --step=5                  # Resume from step 5
+</code></pre>
+
+        <h3>Phase 0: Setup</h3>
+
+        <p>The AI reads the journey file from <code>qa/journeys/</code>, loads the specialist checklists from <code>qa/specialists/</code>, creates a report file, and checks the app is running by hitting <code>http://localhost:5173/login</code>.</p>
+
+        <h3>Phase 1: Step-by-step execution</h3>
+
+        <p>Each journey is a sequence of user actions &mdash; login, navigate, click, fill forms, verify state. For each step:</p>
+
+        <ol>
+          <li><strong>Do the action</strong> &mdash; click, navigate, fill a form (real browser, real clicks via Playwright)</li>
+          <li><strong>Take a snapshot</strong> &mdash; grab the page state, screenshot, console messages, network requests</li>
+          <li><strong>Let the specialists look at it</strong> &mdash; multiple AI agents check the page in parallel</li>
+          <li><strong>Write it down</strong> &mdash; add findings to the report file</li>
+        </ol>
+
+        <h3>Phase 2: Report</h3>
+
+        <p>After all steps are done (or something blocks the journey), the AI writes a summary &mdash; how many issues by severity, a sorted list of findings, and top-5 things to fix.</p>
+
+        <h2>The specialist model</h2>
+
+        <p>This is the part I find most interesting. Each step gets evaluated by multiple specialist agents running in parallel &mdash; each with their own checklist and perspective. I&rsquo;ll cover the specialist model in depth in <a href="/blog/posts/specialist-agents-different-eyes.html">Part 5</a>, but here&rsquo;s the overview.</p>
+
+        <p>I have 7 specialists, each defined as a markdown file in <code>qa/specialists/</code>:</p>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Specialist</th>
+                <th>What it looks for</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>QA</strong></td>
+                <td>Functional correctness &mdash; does the page load, does the data match, do transitions work</td>
+              </tr>
+              <tr>
+                <td><strong>UX</strong></td>
+                <td>Usability &mdash; is navigation clear, are there dead ends, is cognitive load reasonable</td>
+              </tr>
+              <tr>
+                <td><strong>UI</strong></td>
+                <td>Visual quality &mdash; layout, spacing, responsive behavior, color contrast</td>
+              </tr>
+              <tr>
+                <td><strong>Security</strong></td>
+                <td>Auth issues, session management, data exposure, cross-role leaks</td>
+              </tr>
+              <tr>
+                <td><strong>Performance</strong></td>
+                <td>Load times, console errors, unnecessary network requests</td>
+              </tr>
+              <tr>
+                <td><strong>Data Leakage</strong></td>
+                <td>Cross-role data exposure, API over-fetching</td>
+              </tr>
+              <tr>
+                <td><strong>Language</strong></td>
+                <td>Spanish localization consistency (the app is in Spanish)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>They run as parallel sub-agents via Claude Code&rsquo;s Task tool. For a step with 5 specialists, all 5 evaluate simultaneously. Each gets the page snapshot, console messages, network requests, and the step&rsquo;s expected behavior. Each returns findings in their own severity scale.</p>
+
+        <p>If any specialist reports a BLOCKER, the journey stops. I&rsquo;d rather see the blocker, plan a fix, and re-run than have the AI try to auto-fix in context.</p>
+
+        <h2>The journeys</h2>
+
+        <p>Journeys are step-by-step scripts in <code>qa/journeys/</code>. They model real user workflows:</p>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Journey</th>
+                <th>Roles</th>
+                <th>Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>J01</td>
+                <td>Full SOP lifecycle</td>
+                <td>Director, Clinician, Reviewer</td>
+                <td>15-20 min</td>
+              </tr>
+              <tr>
+                <td>J02</td>
+                <td>Template management</td>
+                <td>Admin</td>
+                <td>10-15 min</td>
+              </tr>
+              <tr>
+                <td>J03</td>
+                <td>Interview flow</td>
+                <td>Clinician</td>
+                <td>10-15 min</td>
+              </tr>
+              <tr>
+                <td>J04</td>
+                <td>Review &amp; approval</td>
+                <td>Reviewer</td>
+                <td>10-15 min</td>
+              </tr>
+              <tr>
+                <td>J05</td>
+                <td>BPMN generation</td>
+                <td>Admin, Reviewer</td>
+                <td>10-15 min</td>
+              </tr>
+              <tr>
+                <td>J06</td>
+                <td>User management</td>
+                <td>Admin, Director</td>
+                <td>10-15 min</td>
+              </tr>
+              <tr>
+                <td>J07</td>
+                <td>Dashboard &amp; navigation</td>
+                <td>All roles</td>
+                <td>10-15 min</td>
+              </tr>
+              <tr>
+                <td>J08</td>
+                <td>Holy grail full lifecycle</td>
+                <td>All roles</td>
+                <td>30+ min</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>Each journey defines:</p>
+
+        <ul>
+          <li><strong>Metadata</strong> &mdash; which roles, prerequisites (like <code>make reset</code> for fresh data), priority</li>
+          <li><strong>Steps</strong> &mdash; action, role, which specialists evaluate, expected behavior, and what counts as a blocker</li>
+        </ul>
+
+        <p>Here&rsquo;s what a step looks like in the journey definition:</p>
+
+<pre><code class="language-markdown">### Step 6: Clinician Opens Interview Chat
+- **Action**: Click on a pending interview to open /interviews/:id
+- **Role**: Clinician
+- **Specialists**: [qa, ux, ui, performance]
+- **Expected**:
+  - Chat interface loads with AI greeting
+  - Input field is visible and focusable
+  - Section progress is shown
+  - No console errors
+- **Blocking**: Chat fails to load or input is disabled
+</code></pre>
+
+        <h2>What a report looks like</h2>
+
+        <p>Here&rsquo;s a real excerpt from a J07 (Dashboard &amp; Navigation) report:</p>
+
+<pre><code class="language-markdown">## Step 8: Reviewer Accessible Routes
+**Status**: PASS
+**Action**: Navigate to /reviews, /templates, /library, /calendar, /analytics/patterns
+
+### Findings
+- [OK] /reviews &mdash; loaded with 1 pending SOP, stats panel functional
+- [WARNING] /templates &mdash; redirected with &quot;No tienes permisos&quot; alert.
+  Journey definition lists this as accessible but templates are admin-only.
+  This is correct app behavior &mdash; the journey definition needs updating.
+- [OK] /library &mdash; loaded with tabs and department sidebar
+- [OK] /calendar &mdash; loaded with 12-month layout
+- [WARNING] /analytics/patterns &mdash; page structure loaded but 6 API endpoints
+  returned errors. Data sections empty.
+- [SEC-OK] No admin data leaked on any page
+</code></pre>
+
+        <p>And the summary:</p>
+
+<pre><code class="language-markdown">## Summary
+
+| Severity | Count |
+|----------|-------|
+| BLOCKER  | 0     |
+| BUG      | 0     |
+| WARNING  | 2     |
+| OK       | 70+   |
+
+## Top-5 Recommendations
+
+1. Fix analytics patterns API endpoints &mdash; 6 endpoints return errors
+2. Update journey definition for reviewer /templates access
+3. Role-based navigation is excellent &mdash; each role sees appropriate nav items
+4. Consistent redirect behavior by role &mdash; good pattern
+5. Director user scoping is well-implemented &mdash; production-ready
+</code></pre>
+
+        <h2>The key insight: findings that write themselves</h2>
+
+        <p>The nice thing about <code>/qa-run</code> is that findings are already structured &mdash; I don&rsquo;t have to interpret anything. When I see:</p>
+
+<pre><code class="language-plaintext">[WARNING] /analytics/patterns &mdash; 6 API endpoints return errors
+</code></pre>
+
+        <p>That becomes a Linear issue:</p>
+
+<pre><code class="language-plaintext">Title: Fix analytics patterns API &mdash; 6 endpoints returning errors
+Description: /analytics/patterns page loads structure but all data endpoints fail:
+- /api/v1/analytics/patterns/by-category
+- /api/v1/analytics/patterns/auto-apply-stats
+- /api/v1/analytics/review-efficiency
+- /api/v1/analytics/patterns/most-common
+- /api/v1/analytics/template-effectiveness
+- /api/v1/analytics/quality-improvement
+
+Found by: QA Journey J07, Step 8
+</code></pre>
+
+        <p>That issue goes into Backlog. I run <code>/plan-issue</code> on it, refine it into a spec, move it to Todo. <code>/work-issue</code> picks it up, implements the fix, commits. Next time I run <code>/qa-run 07</code>, those endpoints should return data.</p>
+
+        <p><strong>That&rsquo;s the loop.</strong> Plan &rarr; Work &rarr; QA &rarr; New Issues &rarr; Plan again.</p>
+
+        <h2>Writing new journeys</h2>
+
+        <p>When I add a new feature, I write a new journey (or extend an existing one). A journey is just a markdown file &mdash; no code, no framework, no test runner. The AI interprets the steps and drives the browser.</p>
+
+        <p>This makes journeys easy to write and easy to maintain. When the UI changes, I update the journey description in plain English. No selectors to fix, no test helpers to update.</p>
+
+        <p>The downside is that journeys are less precise than coded tests. The AI might read a step slightly differently each run. But for checking things across roles, permissions, and user flows, I&rsquo;ll take the occasional inconsistency over not checking at all.</p>
+
+        <h2>What I&rsquo;ve learned running QA regularly</h2>
+
+        <p><strong>Run QA after every batch.</strong> After processing 5-10 issues with <code>/work-issue</code>, run the relevant journeys. This catches interaction bugs that unit tests miss.</p>
+
+        <p><strong>Start with J07 (navigation).</strong> It&rsquo;s fast, covers all roles, and catches permission/routing issues immediately. It&rsquo;s my smoke test.</p>
+
+        <p><strong>Use <code>--step=N</code> to resume.</strong> If a journey blocks at step 8, fix the blocker, then run <code>/qa-run 07 --step=8</code> to resume instead of re-running from the start.</p>
+
+        <p><strong>Keep specialist evaluations focused.</strong> Not every step needs every specialist. A login step needs QA and security, not UI and performance. The journey definitions specify which specialists evaluate each step.</p>
+
+        <p><strong>Read the warnings.</strong> BLOCKERs are obvious &mdash; the journey stops. But WARNINGs accumulate. Three warnings about inconsistent empty states across different pages means there&rsquo;s a pattern to fix.</p>
+
+        <h2>What this taught me about testing</h2>
+
+        <p><code>/qa-run</code> isn&rsquo;t a replacement for traditional testing. I still have unit tests, integration tests, and Playwright E2E tests in the standard test suite. What <code>/qa-run</code> adds is:</p>
+
+        <ul>
+          <li>It tests as different users &mdash; Director, Admin, Reviewer, Clinician</li>
+          <li>It checks for things I wouldn&rsquo;t think to test &mdash; security, UX, performance</li>
+          <li>Findings are already written up, I just need to decide which ones to fix</li>
+          <li>I run the same journeys after every batch to make sure nothing broke</li>
+        </ul>
+
+        <p>It&rsquo;s not perfect &mdash; the AI misses things, journeys are imprecise, and I still need to read everything. But it&rsquo;s way more thorough than what I was doing before, which was mostly hoping the unit tests caught stuff.</p>
+
+        <hr>
+
+        <nav class="post-nav">
+          <a class="post-nav-prev" href="/blog/posts/work-issue-autonomous-implementation.html">Part 3 &mdash; /work-issue: Autonomous Implementation</a>
+          <span class="post-nav-spacer"></span>
+        </nav>
+      </div>
+
+      <footer class="blog-footer">
+        <p>&copy; Adri&agrave; Cidre &middot; <a href="/">Home</a></p>
+      </footer>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
