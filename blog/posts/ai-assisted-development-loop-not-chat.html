@@ -83,9 +83,7 @@
 
         <h2>The loop: Plan, Work, QA</h2>
 
-        <p>I use <a href="https://linear.app">Linear</a> as my issue tracker. Issues flow through statuses: Backlog (ideas) &rarr; Todo (planned, ready to implement) &rarr; In Progress (being worked on) &rarr; Done.</p>
-
-        <p>The three Claude Code slash commands map to transitions in this lifecycle:</p>
+        <p>The biggest lesson I&rsquo;ve learned is that AI development works best when it mirrors how structured teams work &mdash; not as a single stream of consciousness, but as distinct phases with clear handoffs. I use <a href="https://linear.app">Linear</a> as my issue tracker, and the three phases map to transitions in the issue lifecycle:</p>
 
 <pre><code class="language-plaintext">/plan-issue  &rarr;  /work-issue  &rarr;  /qa-run
      &uarr;                              |
@@ -100,9 +98,9 @@
           <li><strong><code>/qa-run</code></strong> &mdash; The AI drives a real browser through predefined user journeys, evaluating every step with specialist sub-agents (functional QA, UX, security, performance). Findings get structured into reports. Blockers and bugs become new Linear issues, which feed back into <code>/plan-issue</code>.</li>
         </ol>
 
-        <h2>The docs folder: giving the AI a memory</h2>
+        <h2>What I learned about giving the AI a memory</h2>
 
-        <p>One thing that makes this work is a <code>docs/</code> folder in the project root with architecture documentation that the AI reads during both planning and implementation:</p>
+        <p>One thing I didn&rsquo;t expect to matter so much: the AI needs its own reference material. I ended up creating a <code>docs/</code> folder in the project root with architecture documentation that the AI reads during both planning and implementation:</p>
 
 <pre><code class="language-plaintext">docs/
   architecture/
@@ -116,9 +114,9 @@
 
         <p>The AI reads these docs at the start of every <code>/plan-issue</code> and <code>/work-issue</code> run. This gives it persistent architectural context without me re-explaining things each time.</p>
 
-        <p>Keeping these docs current is part of the workflow &mdash; <code>/plan-issue</code> checks if the planned work would change the architecture or data model, and asks me if I want to update the docs. It&rsquo;s a bit of extra work, but it means the next run doesn&rsquo;t start with stale info.</p>
+        <p>Keeping these docs current is part of the workflow &mdash; <code>/plan-issue</code> checks if the planned work would change the architecture or data model, and asks me if I want to update the docs. I resisted this at first because it felt like overhead. But I learned that stale docs cause worse problems than no docs &mdash; the AI confidently follows outdated patterns. The maintenance cost is small compared to debugging implementations based on wrong assumptions.</p>
 
-        <h2>Why this works for me</h2>
+        <h2>What actually changed for me</h2>
 
         <p><strong>Each piece only needs to know about its own thing.</strong> The AI doesn&rsquo;t need to hold the entire project in its head. <code>/plan-issue</code> only needs the issue and the relevant code. <code>/work-issue</code> gets a spec with file paths and acceptance criteria. <code>/qa-run</code> follows journey steps and checks what it sees.</p>
 
@@ -159,7 +157,7 @@
 
         <h2>What&rsquo;s next</h2>
 
-        <p>In the next posts, I&rsquo;ll walk through each phase &mdash; how the commands work, what the prompts look like, and the specific patterns I&rsquo;ve found that make each phase more reliable.</p>
+        <p>In the next posts, I&rsquo;ll walk through each phase &mdash; not just how the commands work, but the specific lessons I&rsquo;ve learned about what makes each phase reliable (and what I got wrong along the way).</p>
 
         <hr>
 
