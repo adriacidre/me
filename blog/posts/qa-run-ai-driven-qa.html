@@ -67,9 +67,9 @@
 
         <p>After <code>/work-issue</code> commits code, how do I know it actually works? The command runs unit tests and linting, but that doesn&rsquo;t catch what users see &mdash; broken layouts, confusing UX, missing permissions, slow loads, state that doesn&rsquo;t update after an action.</p>
 
-        <p>I built <code>/qa-run</code> for this. It opens a real browser, goes through predefined user journeys (login, click around, fill forms), and at each step a bunch of specialist AI agents look at the page and report what they find. The output is a report. Findings go back into Linear as new issues &mdash; which closes the loop.</p>
+        <p>I built <code>/qa-run</code> for this, and it taught me something I didn&rsquo;t expect: the most valuable thing AI can do for QA isn&rsquo;t finding bugs &mdash; it&rsquo;s looking at the same page from perspectives I wouldn&rsquo;t think to check. It opens a real browser, goes through predefined user journeys, and at each step a bunch of specialist AI agents look at the page and report what they find. Findings go back into Linear as new issues &mdash; which closes the loop.</p>
 
-        <h2>How it works</h2>
+        <h2>How I set it up</h2>
 
 <pre><code class="language-bash">/qa-run 07                           # Run journey 07 (dashboard navigation)
 /qa-run 01                           # Run journey 01 (full SOP lifecycle)
@@ -275,7 +275,7 @@
 5. Director user scoping is well-implemented &mdash; production-ready
 </code></pre>
 
-        <h2>Closing the loop: from findings to issues</h2>
+        <h2>The key insight: findings that write themselves</h2>
 
         <p>The nice thing about <code>/qa-run</code> is that findings are already structured &mdash; I don&rsquo;t have to interpret anything. When I see:</p>
 
@@ -308,7 +308,7 @@ Found by: QA Journey J07, Step 8
 
         <p>The downside is that journeys are less precise than coded tests. The AI might read a step slightly differently each run. But for checking things across roles, permissions, and user flows, I&rsquo;ll take the occasional inconsistency over not checking at all.</p>
 
-        <h2>Patterns that work</h2>
+        <h2>What I&rsquo;ve learned running QA regularly</h2>
 
         <p><strong>Run QA after every batch.</strong> After processing 5-10 issues with <code>/work-issue</code>, run the relevant journeys. This catches interaction bugs that unit tests miss.</p>
 
@@ -320,7 +320,7 @@ Found by: QA Journey J07, Step 8
 
         <p><strong>Read the warnings.</strong> BLOCKERs are obvious &mdash; the journey stops. But WARNINGs accumulate. Three warnings about inconsistent empty states across different pages means there&rsquo;s a pattern to fix.</p>
 
-        <h2>The bigger picture</h2>
+        <h2>What this taught me about testing</h2>
 
         <p><code>/qa-run</code> isn&rsquo;t a replacement for traditional testing. I still have unit tests, integration tests, and Playwright E2E tests in the standard test suite. What <code>/qa-run</code> adds is:</p>
 
