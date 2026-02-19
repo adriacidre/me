@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Specialist Agents: Looking at Every Page with Different Eyes &mdash; Adri&agrave; Cidre</title>
+  <meta name="description" content="Seven specialists, each with their own checklist — QA, UX, UI, Security, Performance, Data Leakage, Language. How splitting evaluation into focused agents catches more.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://adriacidre.com/blog/posts/specialist-agents-different-eyes.html">
+  <meta property="og:title" content="Specialist Agents: Looking at Every Page with Different Eyes">
+  <meta property="og:description" content="Seven specialists, each with their own checklist — QA, UX, UI, Security, Performance, Data Leakage, Language. How splitting evaluation into focused agents catches more.">
+  <meta property="og:image" content="https://adriacidre.com/blog/images/og-default.jpg">
+  <meta property="og:site_name" content="Adri&agrave; Cidre">
+  <meta property="article:published_time" content="2026-02-18">
+  <meta property="article:author" content="Adri&agrave; Cidre">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Specialist Agents: Looking at Every Page with Different Eyes">
+  <meta name="twitter:description" content="Seven specialists, each with their own checklist — QA, UX, UI, Security, Performance, Data Leakage, Language. How splitting evaluation into focused agents catches more.">
+  <meta name="twitter:image" content="https://adriacidre.com/blog/images/og-default.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;600&family=Source+Code+Pro:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="../css/blog.css">
+</head>
+<body>
+  <div class="blog-wrapper">
+    <div class="blog-card">
+      <header class="blog-header">
+        <div class="blog-header-name"><a href="/">Adri&agrave; Cidre</a></div>
+        <nav>
+          <ul class="blog-header-nav">
+            <li><a href="/">Home</a></li>
+            <li><a href="/blog/">Blog</a></li>
+          </ul>
+        </nav>
+      </header>
+
+      <div class="blog-content">
+        <div class="post-meta">
+          <span class="post-meta-date">February 18, 2026</span>
+          <a class="post-meta-series" href="/blog/">AI Development Workflow &mdash; Part 5 of 5</a>
+          <div class="post-meta-tags">
+            <span class="post-meta-tag">ai</span>
+            <span class="post-meta-tag">claude-code</span>
+            <span class="post-meta-tag">qa</span>
+            <span class="post-meta-tag">agents</span>
+            <span class="post-meta-tag">specialists</span>
+            <span class="post-meta-tag">linear</span>
+          </div>
+        </div>
+
+        <div class="series-nav">
+          <div class="series-nav-title">AI Development Workflow &mdash; 5-Part Series</div>
+          <ol class="series-nav-list">
+            <li><a href="/blog/posts/ai-assisted-development-loop-not-chat.html">AI-Assisted Development: A Loop, Not a Chat</a></li>
+            <li><a href="/blog/posts/plan-issue-collaborative-planning.html">/plan-issue: Collaborative Planning with AI</a></li>
+            <li><a href="/blog/posts/work-issue-autonomous-implementation.html">/work-issue: Autonomous Implementation</a></li>
+            <li><a href="/blog/posts/qa-run-ai-driven-qa.html">/qa-run: AI-Driven QA That Closes the Loop</a></li>
+            <li><span class="current">Specialist Agents: Looking at Every Page with Different Eyes</span></li>
+          </ol>
+        </div>
+
+        <h1>Specialist Agents: Looking at Every Page with Different Eyes</h1>
+
+        <p>This is Part 5 of my series on AI-assisted development. <a href="/blog/posts/qa-run-ai-driven-qa.html">Part 4</a> covers how <code>/qa-run</code> works. This post goes deeper into the specialist agent model &mdash; how I get the AI to look at the same page from 7 different perspectives and turn findings into Linear issues.</p>
+
+        <h2>The idea</h2>
+
+        <p>When you look at a page, you&rsquo;re thinking about a bunch of things at once &mdash; does it work, does it look right, is it secure, is it fast, could a different user see stuff they shouldn&rsquo;t. If you ask the AI to check all of that in one prompt, it tends to focus on one thing and miss the rest.</p>
+
+        <p>So I split it up. Instead of one big QA prompt, I have separate specialist agents. Each one only cares about one thing, has a specific checklist, and reports findings in its own format. They all run at the same time on the same page. The result is that each page gets looked at 5-7 times, each time from a different angle.</p>
+
+        <p>The idea came from how QA works in bigger teams &mdash; you have a tester, a security person, a UX designer, each looking at the same build with different concerns. I just wrote that down as markdown prompts.</p>
+
+        <h2>The 7 specialists</h2>
+
+        <p>Each specialist is a markdown file in <code>qa/specialists/</code>. Here&rsquo;s what each one does and why I have it.</p>
+
+        <h3>QA (Functional Correctness)</h3>
+
+        <p><strong>File:</strong> <code>qa/specialists/qa.md</code></p>
+
+        <p>This is the most important one. It checks whether things actually work:</p>
+
+        <ul>
+          <li>Does the page load without errors?</li>
+          <li>Does the URL match the expected route?</li>
+          <li>Do protected routes redirect unauthorized users?</li>
+          <li>Do lists show the right data for this role?</li>
+          <li>Do status transitions follow the SOP lifecycle?</li>
+          <li>Are empty states handled (not just blank areas)?</li>
+        </ul>
+
+        <p>Its severity scale: BLOCKER (page crashes, data loss), BUG (wrong data, broken interaction), WARNING (minor inconsistency), OK.</p>
+
+        <p>This is the specialist that stops journeys. A QA BLOCKER means &ldquo;this page is broken and the journey can&rsquo;t continue.&rdquo;</p>
+
+        <h3>UX (Usability)</h3>
+
+        <p><strong>File:</strong> <code>qa/specialists/ux.md</code></p>
+
+        <p>This one catches the stuff that works but confuses people:</p>
+
+        <ul>
+          <li>Can you tell where you are? (active nav, breadcrumbs, page titles)</li>
+          <li>Are primary actions discoverable without instructions?</li>
+          <li>Does the system give feedback when you do something? (loading states, success/error messages)</li>
+          <li>Do destructive actions require confirmation?</li>
+          <li>Are related things grouped together?</li>
+          <li>Is the terminology consistent?</li>
+        </ul>
+
+        <p>Its severity scale: UX-BLOCKER (user can&rsquo;t complete the task), UX-ISSUE (task completable but confusing), UX-SUGGESTION (could be better).</p>
+
+        <p>I didn&rsquo;t expect this one to be useful &mdash; can an AI really check UX? Turns out it catches real stuff. Things like: &ldquo;the review queue has no empty state &mdash; if there are no pending reviews, the page is just blank&rdquo; or &ldquo;the &lsquo;Aprobar&rsquo; button is the same color as &lsquo;Rechazar&rsquo; &mdash; the confirm and cancel buttons look the same.&rdquo; I&rsquo;d notice these eventually, but the specialist finds them on every page, every time.</p>
+
+        <h3>UI (Visual Quality)</h3>
+
+        <p><strong>File:</strong> <code>qa/specialists/ui.md</code></p>
+
+        <p>Layout and visual consistency:</p>
+
+        <ul>
+          <li>Is the color palette coherent?</li>
+          <li>Is typography hierarchy clear (headings vs body vs labels)?</li>
+          <li>Is spacing consistent?</li>
+          <li>Are interactive elements visually distinct? (hover states, disabled states)</li>
+          <li>Is text contrast sufficient? (WCAG AA)</li>
+          <li>Do empty states have proper visual treatment?</li>
+        </ul>
+
+        <p>It looks at both the page snapshot (what elements are on the page) and the screenshot (what it actually looks like).</p>
+
+        <p>Honestly, this is the weakest specialist. AI isn&rsquo;t great at judging how things look from screenshots. But it does catch obvious stuff &mdash; like a table with no visible header, or a modal that&rsquo;s missing its background overlay. I keep it because it costs nothing extra to run it alongside the others.</p>
+
+        <h3>Security</h3>
+
+        <p><strong>File:</strong> <code>qa/specialists/security.md</code></p>
+
+        <p>Auth, authorization, and data exposure:</p>
+
+        <ul>
+          <li>Does login reject invalid credentials?</li>
+          <li>Is the auth token stored properly?</li>
+          <li>Does logout clear the session?</li>
+          <li>Do role-restricted routes actually block unauthorized access?</li>
+          <li>Do API responses contain data the user shouldn&rsquo;t see?</li>
+          <li>Are error messages exposing internal details? (stack traces, SQL, file paths)</li>
+          <li>Are form inputs sanitized?</li>
+          <li>Are API calls using proper auth headers?</li>
+        </ul>
+
+        <p>This one is especially useful for my app because I have 4 roles (Director, Admin, Reviewer, Clinician) with different permissions. Every journey logs in as multiple roles, and this specialist checks at every step that users can&rsquo;t see stuff they shouldn&rsquo;t.</p>
+
+        <p>A real example: the QA specialist said [OK] for a page loading fine, but the security specialist flagged [SEC-WARNING] because the API response for the user list had email addresses for all users, not just the ones the current role should see. The page was only showing the right ones &mdash; but the data was there in the network response. A normal test would never catch that.</p>
+
+        <h3>Performance</h3>
+
+        <p><strong>File:</strong> <code>qa/specialists/performance.md</code></p>
+
+        <p>Load times, responsiveness, and console health:</p>
+
+        <ul>
+          <li>Does the page become interactive within 3 seconds?</li>
+          <li>Are there layout shifts after initial render?</li>
+          <li>Do click actions respond within 100ms?</li>
+          <li>Are there duplicate API calls for the same data?</li>
+          <li>Are there JavaScript errors or unhandled promise rejections?</li>
+          <li>Are there React warnings (missing keys, deprecated methods)?</li>
+        </ul>
+
+        <p>This one mostly reports PERF-OK or PERF-WARNING. Haven&rsquo;t seen a PERF-BLOCKER yet. But the warnings are handy &mdash; like when a page makes the same API call twice on load. Easy to miss when you&rsquo;re writing code, easy to fix once someone points it out.</p>
+
+        <h3>Data Leakage</h3>
+
+        <p><strong>File:</strong> <code>qa/specialists/data-leakage.md</code></p>
+
+        <p>This is the domain-specific specialist. The app handles sensitive healthcare data. The data leakage specialist checks:</p>
+
+        <ul>
+          <li>AI interview questions stay within SOP scope (no soliciting patient names or case IDs)</li>
+          <li>One clinician&rsquo;s interview data doesn&rsquo;t appear in another&rsquo;s session</li>
+          <li>Page snapshots don&rsquo;t contain identifiable patient information</li>
+          <li>API responses are scoped to the requesting user</li>
+          <li>Client-side storage doesn&rsquo;t contain interview content or clinical data</li>
+          <li>Console logs don&rsquo;t dump interview payloads</li>
+        </ul>
+
+        <p>This specialist exists because of what the app does. If you&rsquo;re building a todo app, you don&rsquo;t need this. If your app handles sensitive data, it&rsquo;s worth thinking about what kind of leakage could happen and writing a checklist for it.</p>
+
+        <h3>Language</h3>
+
+        <p><strong>File:</strong> <code>qa/specialists/language.md</code></p>
+
+        <p>The app UI is entirely in Spanish. This specialist catches:</p>
+
+        <ul>
+          <li>English strings that leaked into the UI (untranslated labels, AI responses switching to English)</li>
+          <li>Inconsistent terminology (using &ldquo;procedimiento&rdquo; in one place and &ldquo;protocolo&rdquo; for the same concept elsewhere)</li>
+          <li>Tone consistency (the app uses formal &ldquo;usted&rdquo; register &mdash; mixing in informal &ldquo;tu&rdquo; would be jarring)</li>
+          <li>Date/number formatting (Spanish conventions, not English)</li>
+        </ul>
+
+        <p>I added this one after noticing that the AI sometimes wrote interview questions in English, or that error messages from the API showed up raw in English instead of being translated. Pretty niche, but if your app is in a language other than English, you&rsquo;ll run into this.</p>
+
+        <h2>How it works under the hood</h2>
+
+        <p>The <code>/qa-run</code> command uses Claude Code&rsquo;s Task tool to run sub-agents. Each specialist is a separate agent that gets:</p>
+
+        <ol>
+          <li>The specialist&rsquo;s evaluation criteria (the markdown file)</li>
+          <li>The step definition (what action was taken, what was expected)</li>
+          <li>The captured page state (accessibility snapshot, console messages, network requests)</li>
+        </ol>
+
+        <p>The prompt template looks roughly like this:</p>
+
+<pre><code class="language-plaintext">You are the {Specialist Name} evaluating Step {N} of QA Journey {ID}.
+
+## Your Evaluation Criteria
+{contents of qa/specialists/{name}.md}
+
+## Step Definition
+- Action: {what was done}
+- Expected: {what should have happened}
+- Blocking: {what counts as a blocker}
+
+## Captured State
+### Page Snapshot
+{accessibility snapshot text}
+
+### Console Messages
+{console output}
+
+### Network Requests
+{network summary}
+
+Evaluate this step against your checklist. Return findings in your output format.
+</code></pre>
+
+        <p>For a step with 5 specialists, all 5 run at the same time. The main agent collects their findings and adds them to the report.</p>
+
+        <h2>From findings to Linear issues</h2>
+
+        <p>The specialists produce findings. I turn those findings into Linear issues. This is the manual step &mdash; I read the report, decide what&rsquo;s worth fixing, and create issues.</p>
+
+        <p>Some examples of specialist findings that became real issues:</p>
+
+        <p><strong>Security specialist found:</strong></p>
+
+<pre><code class="language-plaintext">[SEC-WARNING] API response for user list includes all user emails
+- Page: /admin/users
+- Vector: Network tab shows full email list regardless of role filter
+- Evidence: GET /api/v1/users returns all 8 users for director role
+- Recommendation: Filter response based on role permissions
+</code></pre>
+
+        <p>&rarr; Linear issue: &ldquo;Scope /api/v1/users response by role &mdash; director should only see clinicians&rdquo;</p>
+
+        <p><strong>UX specialist found:</strong></p>
+
+<pre><code class="language-plaintext">[UX-ISSUE] No feedback after clinician sends interview message
+- Page: /interviews/:id
+- Context: User types message and clicks send
+- Issue: Message appears in chat but no visual confirmation (no "sent" indicator, no typing animation)
+- Suggestion: Add message status indicators and AI typing animation
+</code></pre>
+
+        <p>&rarr; Linear issue: &ldquo;Add message status indicators and AI typing animation to interview chat&rdquo;</p>
+
+        <p><strong>Language specialist found:</strong></p>
+
+<pre><code class="language-plaintext">[LANG-WARNING] Date format inconsistency
+- Page: /reviews
+- Element: Review creation date
+- Found: "Feb 15, 2026"
+- Expected: "15 feb 2026" or "15 de febrero de 2026"
+- Source: UI label
+</code></pre>
+
+        <p>&rarr; Linear issue: &ldquo;Fix date formatting across the app to use Spanish conventions&rdquo;</p>
+
+        <p><strong>Performance specialist found:</strong></p>
+
+<pre><code class="language-plaintext">[PERF-WARNING] Duplicate API call on interviews page mount
+- Page: /interviews
+- Metric: 2x GET /api/v1/interviews in rapid succession
+- Expected: Single fetch
+- Impact: Unnecessary network usage, potential race conditions
+</code></pre>
+
+        <p>&rarr; Linear issue: &ldquo;Fix duplicate API call on /interviews page mount&rdquo;</p>
+
+        <p>Each of these issues goes into Linear&rsquo;s Backlog. When I run <code>/plan-issue</code>, they get refined into specs with acceptance criteria. When I run <code>/work-issue</code>, they get implemented. When I run <code>/qa-run</code> again, I verify the fixes.</p>
+
+        <h2>Configuring which specialists run</h2>
+
+        <p>Not every step needs every specialist. A login step needs QA and security, but probably not UI and performance. The journey definitions specify which specialists evaluate each step:</p>
+
+<pre><code class="language-markdown">### Step 1: Director Login &amp; Dashboard
+- **Specialists**: [qa, ux, ui, security]
+
+### Step 7: Clinician Sends Message
+- **Specialists**: [qa, ux, performance]
+</code></pre>
+
+        <p>You can also override at the command line:</p>
+
+<pre><code class="language-bash">/qa-run 07 --specialists=qa,security    # Only functional and security
+</code></pre>
+
+        <p>This keeps things focused. When I&rsquo;m looking at performance after a batch of changes, I run with <code>--specialists=performance</code>. When I&rsquo;m doing a full check, I let the journey definition decide.</p>
+
+        <h2>Writing your own specialist</h2>
+
+        <p>Adding a specialist is just adding a markdown file to <code>qa/specialists/</code>. The structure is:</p>
+
+        <ol>
+          <li><strong>Role description</strong> &mdash; &ldquo;You are a {X} specialist evaluating {Y}&rdquo;</li>
+          <li><strong>Evaluation checklist</strong> &mdash; numbered sections with specific things to check</li>
+          <li><strong>Output format</strong> &mdash; the structure for each finding</li>
+          <li><strong>Severity tags</strong> &mdash; what each severity level means for this specialist</li>
+        </ol>
+
+        <p>The checklist is the part that matters. Be specific. &ldquo;Check if the page is accessible&rdquo; is useless &mdash; the AI will just say OK. &ldquo;Form fields have labels, focus goes in the right order, buttons are at least 44x44px&rdquo; gives it something concrete to check.</p>
+
+        <p>My first versions were too vague &mdash; the specialist would just report [OK] on everything. I&rsquo;ve been tightening the checklists over time based on what I actually care about and what I&rsquo;ve seen go wrong.</p>
+
+        <h2>Limitations</h2>
+
+        <p>I want to be clear about what this doesn&rsquo;t do:</p>
+
+        <p><strong>It&rsquo;s not real security testing.</strong> The security specialist checks for obvious stuff &mdash; auth, permissions, data showing up where it shouldn&rsquo;t. It&rsquo;s not doing pen testing or checking for server-side vulnerabilities. If you need real security testing, hire someone.</p>
+
+        <p><strong>Visual evaluation is weak.</strong> AI isn&rsquo;t great at judging how things look from screenshots. It catches obvious stuff (missing elements, broken layout) but misses subtle things (slightly off spacing, colors that are technically fine but look bad).</p>
+
+        <p><strong>It&rsquo;s not the same every time.</strong> Running the same journey twice might give slightly different findings. The AI might read a step differently or flag something one run and miss it the next. That&rsquo;s the trade-off with natural language journeys instead of coded tests.</p>
+
+        <p><strong>There are false positives.</strong> Some findings are noise. The specialist might flag something that&rsquo;s on purpose, or report something that doesn&rsquo;t matter. I read every report and decide what to act on &mdash; I don&rsquo;t just create issues for everything.</p>
+
+        <p>Still &mdash; I&rsquo;m one person doing dev, QA, UX, security, all of it. Having 7 AI agents look at every page from different angles catches things I&rsquo;d miss. It&rsquo;s not a replacement for any of those jobs, but it&rsquo;s better than not doing them at all.</p>
+
+        <hr>
+
+        <nav class="post-nav">
+          <a class="post-nav-prev" href="/blog/posts/qa-run-ai-driven-qa.html">Part 4 &mdash; /qa-run: AI-Driven QA</a>
+          <a class="post-nav-next" href="/blog/">Back to series overview</a>
+        </nav>
+      </div>
+
+      <footer class="blog-footer">
+        <p>&copy; Adri&agrave; Cidre &middot; <a href="/">Home</a></p>
+      </footer>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
