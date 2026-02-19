@@ -68,9 +68,9 @@
 
         <p>So I started planning separately from implementing. <code>/plan-issue</code> is a Claude Code slash command that takes a rough Linear issue and turns it into a detailed spec through conversation. The AI explores the codebase, I make decisions. No code gets written. The output is a Linear issue with enough detail that <code>/work-issue</code> can implement it later without needing me in the room.</p>
 
-        <h2>How it works</h2>
+        <h2>How I structured the planning phase</h2>
 
-        <p>The command is defined as a markdown prompt in <code>.claude/commands/plan-issue.md</code>. When I type <code>/plan-issue</code> in Claude Code, the AI follows a structured 9-step protocol.</p>
+        <p>The command is a markdown prompt in <code>.claude/commands/plan-issue.md</code>. I iterated on this a lot before landing on something that worked. The key insight was that planning needs a rigid structure &mdash; otherwise I&rsquo;d skip steps and end up with vague specs anyway. Here&rsquo;s what the protocol looks like now and why each piece matters.</p>
 
         <h3>Step 1: Fetch the issue</h3>
 
@@ -199,9 +199,9 @@ Add notification system for upcoming review deadlines.
 
         <p>If the planned work would change the architecture, data model, or API surface, the AI asks if I want to update the relevant files in <code>docs/</code>. I usually say yes &mdash; it&rsquo;s a small overhead that keeps future runs accurate. The AI drafts the doc update, I review it, and it gets applied alongside moving the issue to Todo.</p>
 
-        <h2>Why I bother planning separately</h2>
+        <h2>The lesson: planning is where the real work happens</h2>
 
-        <p>This might seem like unnecessary overhead. Why not just let the AI start coding? In my experience:</p>
+        <p>I almost didn&rsquo;t build this phase. It seemed like unnecessary overhead &mdash; why not just let the AI start coding? Here&rsquo;s what changed my mind:</p>
 
         <p><strong>It catches scope issues before code exists.</strong> The worst time to discover an issue is too big is after you&rsquo;ve written half of it. Planning forces the &ldquo;this needs splitting&rdquo; conversation up front, when it&rsquo;s free.</p>
 
@@ -211,7 +211,7 @@ Add notification system for upcoming review deadlines.
 
         <p><strong>It&rsquo;s faster than it sounds.</strong> A planning session takes 5-10 minutes. I spend my time on the interesting parts &mdash; making decisions, answering questions, deciding what&rsquo;s in and what&rsquo;s out.</p>
 
-        <h2>Key patterns I&rsquo;ve learned</h2>
+        <h2>Mistakes I made and what I&rsquo;d do differently</h2>
 
         <p><strong>Start from Backlog, not from your head.</strong> Keep your ideas in Linear&rsquo;s Backlog. Let <code>/plan-issue</code> pull from there. This prevents the &ldquo;I&rsquo;ll just quickly add this&rdquo; temptation that leads to unplanned scope.</p>
 
