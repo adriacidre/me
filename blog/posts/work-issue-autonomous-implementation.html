@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>/work-issue: Autonomous Implementation &mdash; Adri&agrave; Cidre</title>
+  <meta name="description" content="The AI picks up a planned issue, implements it, tests it, commits, and marks it done. How headless batch mode lets me plan in the afternoon and wake up with code.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://adriacidre.com/blog/posts/work-issue-autonomous-implementation.html">
+  <meta property="og:title" content="/work-issue: Autonomous Implementation">
+  <meta property="og:description" content="The AI picks up a planned issue, implements it, tests it, commits, and marks it done. How headless batch mode lets me plan in the afternoon and wake up with code.">
+  <meta property="og:image" content="https://adriacidre.com/blog/images/og-default.jpg">
+  <meta property="og:site_name" content="Adri&agrave; Cidre">
+  <meta property="article:published_time" content="2026-02-18">
+  <meta property="article:author" content="Adri&agrave; Cidre">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="/work-issue: Autonomous Implementation">
+  <meta name="twitter:description" content="The AI picks up a planned issue, implements it, tests it, commits, and marks it done. How headless batch mode lets me plan in the afternoon and wake up with code.">
+  <meta name="twitter:image" content="https://adriacidre.com/blog/images/og-default.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;600&family=Source+Code+Pro:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="../css/blog.css">
+</head>
+<body>
+  <div class="blog-wrapper">
+    <div class="blog-card">
+      <header class="blog-header">
+        <div class="blog-header-name"><a href="/">Adri&agrave; Cidre</a></div>
+        <nav>
+          <ul class="blog-header-nav">
+            <li><a href="/">Home</a></li>
+            <li><a href="/blog/">Blog</a></li>
+          </ul>
+        </nav>
+      </header>
+
+      <div class="blog-content">
+        <div class="post-meta">
+          <span class="post-meta-date">February 18, 2026</span>
+          <a class="post-meta-series" href="/blog/">AI Development Workflow &mdash; Part 3 of 5</a>
+          <div class="post-meta-tags">
+            <span class="post-meta-tag">ai</span>
+            <span class="post-meta-tag">claude-code</span>
+            <span class="post-meta-tag">automation</span>
+            <span class="post-meta-tag">linear</span>
+            <span class="post-meta-tag">batch-processing</span>
+            <span class="post-meta-tag">ntfy</span>
+          </div>
+        </div>
+
+        <div class="series-nav">
+          <div class="series-nav-title">AI Development Workflow &mdash; 5-Part Series</div>
+          <ol class="series-nav-list">
+            <li><a href="/blog/posts/ai-assisted-development-loop-not-chat.html">AI-Assisted Development: A Loop, Not a Chat</a></li>
+            <li><a href="/blog/posts/plan-issue-collaborative-planning.html">/plan-issue: Collaborative Planning with AI</a></li>
+            <li><span class="current">/work-issue: Autonomous Implementation</span></li>
+            <li><span class="upcoming">/qa-run: AI-Driven QA That Closes the Loop</span></li>
+            <li><span class="upcoming">Specialist Agents: Looking at Every Page with Different Eyes</span></li>
+          </ol>
+        </div>
+
+        <h1>/work-issue: Autonomous Implementation</h1>
+
+        <p>This is Part 3 of my series on AI-assisted development. <a href="/blog/posts/ai-assisted-development-loop-not-chat.html">Part 1</a> covers the loop, <a href="/blog/posts/plan-issue-collaborative-planning.html">Part 2</a> covers planning.</p>
+
+        <p><code>/plan-issue</code> is collaborative &mdash; I sit with the AI and make decisions. <code>/work-issue</code> is the opposite. It&rsquo;s autonomous. The AI picks up a planned issue from Linear, implements it, tests it, commits it, and marks it Done. I&rsquo;m not in the room.</p>
+
+        <p><code>/work-issue</code> works fine interactively, but it gets way more useful in headless mode with <code>claude -p</code>. You can put it on a loop and leave it running overnight. My day now looks like: plan issues in the afternoon, start the batch script in the evening, review commits and run QA in the morning. My laptop is basically always doing something.</p>
+
+        <p>This only works because planning happened first. The spec in the Linear issue tells the AI exactly what to build, which files to touch, what tests to write, and what&rsquo;s out of scope. Without that, autonomous implementation is unreliable. I tried &mdash; it produced code I&rsquo;d have to rewrite anyway.</p>
+
+        <h2>The 13-step protocol</h2>
+
+        <p><code>/work-issue</code> follows a rigid protocol defined in <code>.claude/commands/work-issue.md</code>. Here&rsquo;s what happens:</p>
+
+        <h3>1. Pick an issue</h3>
+
+<pre><code class="language-bash">/work-issue                          # Auto-pick oldest Todo issue
+/work-issue --id=BROT-42             # Specific issue
+/work-issue --git=pr                 # Auto-pick, create a PR
+/work-issue --id=BROT-42 --git=pr   # Specific issue, create a PR
+</code></pre>
+
+        <p>Auto-pick grabs the oldest issue in <strong>Todo</strong> &mdash; which is the queue that <code>/plan-issue</code> populates. This means issues get processed in the order they were planned.</p>
+
+        <p>There&rsquo;s also parent issue detection. If the picked issue has subtasks, the AI works on the first Todo subtask instead of the parent. When all subtasks are done, the parent auto-completes.</p>
+
+        <h3>2. Claim it</h3>
+
+        <p>The issue moves to <strong>In Progress</strong> immediately. This is critical for batch mode &mdash; it prevents the next run from picking the same issue.</p>
+
+        <h3>3. Git setup</h3>
+
+        <p>Three strategies:</p>
+
+        <ul>
+          <li><strong><code>main</code></strong> (default) &mdash; work directly on main. Good for small, well-planned changes.</li>
+          <li><strong><code>branch</code></strong> &mdash; create <code>issue/brot-42-add-notifications</code> feature branch. Good for larger changes you want to review before merging.</li>
+          <li><strong><code>pr</code></strong> &mdash; create branch + push + open a GitHub PR. Good for team workflows.</li>
+        </ul>
+
+        <h3>4. Plan (internally)</h3>
+
+        <p>The AI reads the issue spec from Linear, fetches comments and related issues, reads the architecture docs from <code>docs/</code> (same ones used during planning &mdash; platform overview, tech stack, data model), and explores the relevant code. It builds an internal plan &mdash; no plan file is written, it just organizes its approach.</p>
+
+        <p>If the issue is too vague (bad spec, missing details), the AI adds a Linear comment explaining what&rsquo;s unclear and stops. This is an important guardrail &mdash; it&rsquo;s better to stop than to guess wrong.</p>
+
+        <h3>5-6. Implement and test</h3>
+
+        <p>The AI writes code following existing patterns. This is where the spec pays off:</p>
+
+        <ul>
+          <li><strong>&ldquo;Files likely affected&rdquo;</strong> tells it where to look</li>
+          <li><strong>&ldquo;Technical approach&rdquo;</strong> tells it what to do</li>
+          <li><strong>&ldquo;Acceptance criteria&rdquo;</strong> tells it when to stop</li>
+          <li><strong>&ldquo;Out of scope&rdquo;</strong> tells it what NOT to do</li>
+        </ul>
+
+        <p>It writes tests for every implementation &mdash; backend Go tests, frontend Vitest tests. This isn&rsquo;t optional; the protocol requires it.</p>
+
+        <h3>7-8. Verify</h3>
+
+<pre><code class="language-bash">make test          # All tests
+make test-frontend # Frontend specifically
+make typecheck     # TypeScript checks
+make check         # fmt + vet + lint + tests
+</code></pre>
+
+        <p>If tests fail, the AI fixes and retries. If lint fails, it fixes and retries. Up to 3 attempts before noting the issue and moving on.</p>
+
+        <h3>9. Self-review</h3>
+
+        <p>The AI runs <code>git diff</code> and checks its own work for:</p>
+
+        <ul>
+          <li>Leftover debug statements</li>
+          <li>Hardcoded values</li>
+          <li>Missing error handling</li>
+          <li>SQL injection or security issues</li>
+          <li>Naming inconsistencies</li>
+        </ul>
+
+        <p>This catches a surprising amount of things. AI is good at following checklists.</p>
+
+        <h3>10-11. Commit and push</h3>
+
+        <p>Only files relevant to the issue get staged &mdash; never <code>git add -A</code>. The commit message follows a consistent format:</p>
+
+<pre><code class="language-plaintext">BROT-42: Add review deadline notifications
+
+- Add notification_preferences table and migration
+- Implement daily cron job for deadline checking
+- Add NotificationBadge component to Calendar page
+
+Co-Authored-By: Claude Opus 4.6 &lt;noreply@anthropic.com&gt;
+</code></pre>
+
+        <h3>12. Update Linear</h3>
+
+        <p>The AI comments on the issue with a summary of what was done, which files changed, the commit hash, and test results. Then it marks the issue <strong>Done</strong>.</p>
+
+        <p>If this was a subtask, it checks if all siblings are done. If so, it auto-completes the parent.</p>
+
+        <h3>13. Notify</h3>
+
+<pre><code class="language-bash">curl -d "brot: Completed BROT-42 — Add review deadline notifications" "$NTFY_URL"
+</code></pre>
+
+        <p>This sends a push notification via <a href="https://ntfy.sh">ntfy</a> to my phone. When I&rsquo;m running batch mode and doing something else entirely, I get a ping for each completed issue. It&rsquo;s the &ldquo;ding&rdquo; that lets me know work is happening in the background.</p>
+
+        <h2>Headless batch mode: the overnight workflow</h2>
+
+        <p>The batch orchestrator is a shell script that processes multiple issues one after the other. Each issue gets its own headless <code>claude -p</code> call &mdash; fresh context, no leftover state from the previous issue:</p>
+
+<pre><code class="language-bash">./scripts/work-linear-issues.sh -n 10 --stop-on-error
+</code></pre>
+
+        <p>I usually kick this off in the evening with 8-10 planned issues in Linear. Takes a few hours to go through them &mdash; each issue runs for 2-5 minutes depending on how big it is. By morning, most of them are done.</p>
+
+        <p>What the script does:</p>
+
+        <ol>
+          <li><strong>Queries Linear</strong> for the next Todo issue</li>
+          <li><strong>Spawns <code>claude -p</code></strong> with the work-issue prompt in a fresh context</li>
+          <li><strong>Monitors progress</strong> with a live spinner that shows elapsed time and files being changed</li>
+          <li><strong>Handles failures</strong> &mdash; retries on transient API errors, stops or continues based on flags</li>
+          <li><strong>Prints a summary</strong> when done</li>
+        </ol>
+
+<pre><code class="language-plaintext">╭─────────────────────────────────────────────╮
+│  Linear Issue Processor                      │
+│                                             │
+│  Issues: 5    Model: auto     Git: main     │
+│  Stop on error: false                       │
+╰─────────────────────────────────────────────╯
+
+  ● BROT-38 (High) Fix login redirect loop [opus]
+  ✓ BROT-38: Fix login redirect loop (3m 42s)
+    Files (3):
+      internal/api/auth.go
+      web/src/hooks/useAuth.ts
+      web/src/components/LoginForm.test.tsx
+    Commit: a1b2c3d BROT-38: Fix login redirect loop
+
+  ● BROT-39 (Medium) Add empty state to library [sonnet]
+  ✓ BROT-39: Add empty state to library (1m 15s)
+    ...
+
+╭─────────────────────────────────────────────╮
+│  Summary                                     │
+├─────────────────────────────────────────────┤
+│  ✓ BROT-38  Fix login redirect loop   3m42s │
+│  ✓ BROT-39  Add empty state to lib    1m15s │
+│  ✓ BROT-40  Update review badges      2m03s │
+│  ✗ BROT-41  Refactor calendar view    5m00s │
+│  ✓ BROT-42  Add notifications         4m22s │
+├─────────────────────────────────────────────┤
+│  Completed: 4    Failed: 1    Total: 5      │
+│  Elapsed: 16m 22s                           │
+╰─────────────────────────────────────────────╯</code></pre>
+
+        <h3>Picking the model automatically</h3>
+
+        <p>The <code>--model auto</code> flag (default) picks the model based on issue priority:</p>
+
+        <ul>
+          <li><strong>Urgent/High priority</strong> &rarr; Opus (smarter, slower, costs more)</li>
+          <li><strong>Medium/Low priority</strong> &rarr; Sonnet (fast, cheap, good enough for most things)</li>
+        </ul>
+
+        <p>Most well-planned issues don&rsquo;t need the biggest model. No point spending money on Opus for a one-file bug fix.</p>
+
+        <h3>Fresh context per issue</h3>
+
+        <p>Each issue gets its own <code>claude -p</code> call &mdash; completely fresh, no memory of the previous issue. This is on purpose:</p>
+
+        <ul>
+          <li>No leftover confusion from the previous issue</li>
+          <li>Each one starts clean with just the spec and the codebase</li>
+        </ul>
+
+        <p>The downside is it has to re-read the docs and explore the code every time. The upside is it doesn&rsquo;t get confused.</p>
+
+        <h3>Failure handling</h3>
+
+        <p>When an issue fails:</p>
+
+        <ul>
+          <li>The AI leaves it <strong>In Progress</strong> with a comment explaining what went wrong</li>
+          <li>The working tree is cleaned up (<code>git checkout .</code>)</li>
+          <li>The script either stops (<code>--stop-on-error</code>) or continues to the next issue</li>
+          <li>A detailed log is saved to <code>logs/work-issues/</code></li>
+        </ul>
+
+        <p>Failed issues don&rsquo;t disappear &mdash; they stay visible in Linear for me to investigate and re-plan.</p>
+
+        <h2>Notifications: staying in the loop without being in the room</h2>
+
+        <p>Both <code>/plan-issue</code> and <code>/work-issue</code> send push notifications via <a href="https://ntfy.sh">ntfy</a> when they complete. My global Claude Code config (<code>~/.claude/CLAUDE.md</code>) defines the pattern:</p>
+
+<pre><code class="language-bash">curl -d "brot: Completed BROT-42 — Add review deadline notifications" "$NTFY_URL"
+</code></pre>
+
+        <p>In practice, when I kick off a batch in the evening, I wake up to a trail of notifications:</p>
+
+<pre><code class="language-plaintext">brot: Completed BROT-38 — Fix login redirect loop
+brot: Completed BROT-39 — Add empty state to library
+brot: Completed BROT-40 — Update review status badges
+brot: Completed BROT-42 — Add review notifications</code></pre>
+
+        <p>(BROT-41 failed silently &mdash; no notification &mdash; which is itself a signal to go check the logs.)</p>
+
+        <p>This matters more than I expected. When the batch runs overnight, waking up to 6-7 notifications means stuff got done while I slept. No notification for an issue means something went wrong &mdash; time to check the logs and re-plan. Simple, but it makes the whole overnight thing feel way less like a black box.</p>
+
+        <h2>Guardrails</h2>
+
+        <p>The protocol has explicit guardrails:</p>
+
+        <ul>
+          <li><strong>One issue per run.</strong> Never attempt multiple issues in the same context.</li>
+          <li><strong>Never <code>git push --force</code> or <code>git reset --hard</code>.</strong> No destructive git operations.</li>
+          <li><strong>Never modify <code>.env</code> files.</strong> Secrets stay untouched.</li>
+          <li><strong>Never delete existing tests.</strong> Only add or modify.</li>
+          <li><strong>If something feels wrong, stop.</strong> Add a comment and leave the issue In Progress.</li>
+          <li><strong>Only stage files you changed.</strong> Never <code>git add -A</code> (which would catch unrelated formatting changes from linting).</li>
+        </ul>
+
+        <p>These guardrails exist because autonomous means unattended &mdash; and in my case, literally overnight while I&rsquo;m asleep. The cost of the AI making a bad decision at 2am is higher than the cost of it being conservative. I&rsquo;d rather wake up to a failed issue (that I can re-plan) than to a force-pushed branch or a deleted test file.</p>
+
+        <h2>When it works, when it doesn&rsquo;t</h2>
+
+        <p><strong>Works well for:</strong></p>
+
+        <ul>
+          <li>Well-planned issues with clear acceptance criteria</li>
+          <li>Issues that follow existing patterns (new handler, new component, new test)</li>
+          <li>Bug fixes with reproduction steps in the spec</li>
+          <li>Small-to-medium scope (1-5 files)</li>
+        </ul>
+
+        <p><strong>Doesn&rsquo;t work well for:</strong></p>
+
+        <ul>
+          <li>Vague issues (&ldquo;make the UI better&rdquo;)</li>
+          <li>Architecture changes that require judgment calls</li>
+          <li>Issues that depend on external services the AI can&rsquo;t access</li>
+          <li>Large refactors that touch 20+ files</li>
+        </ul>
+
+        <p>Bottom line: <code>/work-issue</code> is only as good as the spec it gets. Bad spec, bad code. That&rsquo;s why I bother with <code>/plan-issue</code>.</p>
+
+        <hr>
+
+        <nav class="post-nav">
+          <a class="post-nav-prev" href="/blog/posts/plan-issue-collaborative-planning.html">Part 2 &mdash; /plan-issue: Collaborative Planning</a>
+          <span class="post-nav-spacer"></span>
+        </nav>
+      </div>
+
+      <footer class="blog-footer">
+        <p>&copy; Adri&agrave; Cidre &middot; <a href="/">Home</a></p>
+      </footer>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
