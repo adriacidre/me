@@ -65,17 +65,17 @@
 
         <p>This is Part 5 of my series on AI-assisted development. <a href="/blog/posts/qa-run-ai-driven-qa.html">Part 4</a> covers how <code>/qa-run</code> works. This post goes deeper into the specialist agent model &mdash; how I get the AI to look at the same page from 7 different perspectives and turn findings into Linear issues.</p>
 
-        <h2>The idea</h2>
+        <h2>The insight that changed everything</h2>
 
-        <p>When you look at a page, you&rsquo;re thinking about a bunch of things at once &mdash; does it work, does it look right, is it secure, is it fast, could a different user see stuff they shouldn&rsquo;t. If you ask the AI to check all of that in one prompt, it tends to focus on one thing and miss the rest.</p>
+        <p>My first version of QA was one big prompt: &ldquo;check this page for issues.&rdquo; It was terrible. The AI would fixate on one thing &mdash; usually functional correctness &mdash; and miss everything else. Security, UX, performance? Invisible.</p>
 
-        <p>So I split it up. Instead of one big QA prompt, I have separate specialist agents. Each one only cares about one thing, has a specific checklist, and reports findings in its own format. They all run at the same time on the same page. The result is that each page gets looked at 5-7 times, each time from a different angle.</p>
+        <p>The breakthrough came from thinking about how real teams work. In a bigger company, you&rsquo;d have a tester, a security person, a UX designer &mdash; each looking at the same build with different concerns. I realized I could simulate that by splitting one big QA prompt into separate specialist agents, each with its own narrow focus and checklist. They all run in parallel on the same page. The result is that each page gets evaluated 5-7 times, each time from a different angle.</p>
 
-        <p>The idea came from how QA works in bigger teams &mdash; you have a tester, a security person, a UX designer, each looking at the same build with different concerns. I just wrote that down as markdown prompts.</p>
+        <p>This was the single biggest quality improvement in the whole workflow. Not because any individual specialist is brilliant, but because multiple focused perspectives catch things that one broad pass never will.</p>
 
-        <h2>The 7 specialists</h2>
+        <h2>The 7 specialists (and why each one exists)</h2>
 
-        <p>Each specialist is a markdown file in <code>qa/specialists/</code>. Here&rsquo;s what each one does and why I have it.</p>
+        <p>Each specialist is just a markdown file in <code>qa/specialists/</code>. I didn&rsquo;t start with seven &mdash; I started with two (QA and security) and added the rest as I kept finding categories of issues I was missing. Here&rsquo;s what I ended up with and what taught me to add each one.</p>
 
         <h3>QA (Functional Correctness)</h3>
 
@@ -241,7 +241,7 @@ Evaluate this step against your checklist. Return findings in your output format
 
         <p>For a step with 5 specialists, all 5 run at the same time. The main agent collects their findings and adds them to the report.</p>
 
-        <h2>From findings to Linear issues</h2>
+        <h2>What surprised me: how findings become work</h2>
 
         <p>The specialists produce findings. I turn those findings into Linear issues. This is the manual step &mdash; I read the report, decide what&rsquo;s worth fixing, and create issues.</p>
 
@@ -312,7 +312,7 @@ Evaluate this step against your checklist. Return findings in your output format
 
         <p>This keeps things focused. When I&rsquo;m looking at performance after a batch of changes, I run with <code>--specialists=performance</code>. When I&rsquo;m doing a full check, I let the journey definition decide.</p>
 
-        <h2>Writing your own specialist</h2>
+        <h2>What I&rsquo;d tell you if you build your own</h2>
 
         <p>Adding a specialist is just adding a markdown file to <code>qa/specialists/</code>. The structure is:</p>
 
@@ -327,9 +327,9 @@ Evaluate this step against your checklist. Return findings in your output format
 
         <p>My first versions were too vague &mdash; the specialist would just report [OK] on everything. I&rsquo;ve been tightening the checklists over time based on what I actually care about and what I&rsquo;ve seen go wrong.</p>
 
-        <h2>Limitations</h2>
+        <h2>Where I&rsquo;d be honest about the limits</h2>
 
-        <p>I want to be clear about what this doesn&rsquo;t do:</p>
+        <p>I don&rsquo;t want to oversell this. Here&rsquo;s what I&rsquo;ve learned it can&rsquo;t do:</p>
 
         <p><strong>It&rsquo;s not real security testing.</strong> The security specialist checks for obvious stuff &mdash; auth, permissions, data showing up where it shouldn&rsquo;t. It&rsquo;s not doing pen testing or checking for server-side vulnerabilities. If you need real security testing, hire someone.</p>
 
