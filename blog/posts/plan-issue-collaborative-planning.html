@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>/plan-issue: Collaborative Planning with AI &mdash; Adri&agrave; Cidre</title>
+  <meta name="description" content="Vague instructions produce vague implementations. How I sit with the AI to refine rough ideas into concrete, implementable specs — before any code gets written.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://adriacidre.com/blog/posts/plan-issue-collaborative-planning.html">
+  <meta property="og:title" content="/plan-issue: Collaborative Planning with AI">
+  <meta property="og:description" content="Vague instructions produce vague implementations. How I sit with the AI to refine rough ideas into concrete, implementable specs — before any code gets written.">
+  <meta property="og:image" content="https://adriacidre.com/blog/images/og-default.jpg">
+  <meta property="og:site_name" content="Adri&agrave; Cidre">
+  <meta property="article:published_time" content="2026-02-18">
+  <meta property="article:author" content="Adri&agrave; Cidre">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="/plan-issue: Collaborative Planning with AI">
+  <meta name="twitter:description" content="Vague instructions produce vague implementations. How I sit with the AI to refine rough ideas into concrete, implementable specs — before any code gets written.">
+  <meta name="twitter:image" content="https://adriacidre.com/blog/images/og-default.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;600&family=Source+Code+Pro:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="../css/blog.css">
+</head>
+<body>
+  <div class="blog-wrapper">
+    <div class="blog-card">
+      <header class="blog-header">
+        <div class="blog-header-name"><a href="/">Adri&agrave; Cidre</a></div>
+        <nav>
+          <ul class="blog-header-nav">
+            <li><a href="/">Home</a></li>
+            <li><a href="/blog/">Blog</a></li>
+          </ul>
+        </nav>
+      </header>
+
+      <div class="blog-content">
+        <div class="post-meta">
+          <span class="post-meta-date">February 18, 2026</span>
+          <a class="post-meta-series" href="/blog/">AI Development Workflow &mdash; Part 2 of 5</a>
+          <div class="post-meta-tags">
+            <span class="post-meta-tag">ai</span>
+            <span class="post-meta-tag">claude-code</span>
+            <span class="post-meta-tag">planning</span>
+            <span class="post-meta-tag">linear</span>
+            <span class="post-meta-tag">slash-commands</span>
+          </div>
+        </div>
+
+        <div class="series-nav">
+          <div class="series-nav-title">AI Development Workflow &mdash; 5-Part Series</div>
+          <ol class="series-nav-list">
+            <li><a href="/blog/posts/ai-assisted-development-loop-not-chat.html">AI-Assisted Development: A Loop, Not a Chat</a></li>
+            <li><span class="current">/plan-issue: Collaborative Planning with AI</span></li>
+            <li><span class="upcoming">/work-issue: Autonomous Implementation</span></li>
+            <li><span class="upcoming">/qa-run: AI-Driven QA That Closes the Loop</span></li>
+            <li><span class="upcoming">Specialist Agents: Looking at Every Page with Different Eyes</span></li>
+          </ol>
+        </div>
+
+        <h1>/plan-issue: Collaborative Planning with AI</h1>
+
+        <p>This is Part 2 of my series on AI-assisted development. <a href="/blog/posts/ai-assisted-development-loop-not-chat.html">Part 1</a> covers the overall workflow loop.</p>
+
+        <p>I kept running into the same problem: the AI would implement something, and it wasn&rsquo;t what I wanted. Not because the AI was bad at coding, but because I was bad at specifying. Vague instructions produce vague implementations.</p>
+
+        <p>So I started planning separately from implementing. <code>/plan-issue</code> is a Claude Code slash command that takes a rough Linear issue and turns it into a detailed spec through conversation. The AI explores the codebase, I make decisions. No code gets written. The output is a Linear issue with enough detail that <code>/work-issue</code> can implement it later without needing me in the room.</p>
+
+        <h2>How I structured the planning phase</h2>
+
+        <p>The command is a markdown prompt in <code>.claude/commands/plan-issue.md</code>. I iterated on this a lot before landing on something that worked. The key insight was that planning needs a rigid structure &mdash; otherwise I&rsquo;d skip steps and end up with vague specs anyway. Here&rsquo;s what the protocol looks like now and why each piece matters.</p>
+
+        <h3>Step 1: Fetch the issue</h3>
+
+<pre><code class="language-bash">/plan-issue                    # Auto-pick oldest Backlog issue
+/plan-issue --id=BROT-42       # Plan a specific issue
+</code></pre>
+
+        <p>The AI connects to Linear via MCP, grabs the issue, and shows me what we&rsquo;re working with &mdash; title, priority, existing description (often sparse or empty).</p>
+
+        <h3>Step 2: Claim it</h3>
+
+        <p>The issue moves to <strong>In Progress</strong> immediately. This prevents another run (or another developer) from picking the same issue. Simple but important when you&rsquo;re batching work.</p>
+
+        <h3>Step 3: Gather context</h3>
+
+        <p>The AI reads:</p>
+
+        <ul>
+          <li><strong>Linear data</strong> &mdash; comments, parent issues, sub-issues, related issues</li>
+          <li><strong>Architecture docs</strong> from <code>docs/</code> &mdash; platform overview, tech stack, data model (I mentioned this in Part 1 &mdash; the <code>docs/</code> folder gives the AI persistent project context)</li>
+          <li><strong>Relevant code</strong> &mdash; existing handlers, components, DB queries in the area the issue touches</li>
+        </ul>
+
+        <p>It puts together what exists, what needs to change, and what could go wrong. This is stuff I&rsquo;d otherwise do by hand &mdash; grepping through files, reading handlers, checking the schema.</p>
+
+        <h3>Step 4: Present analysis</h3>
+
+        <p>The AI presents its findings in a structured format:</p>
+
+<pre><code class="language-markdown">## Analysis: Add review calendar notifications
+
+### What exists today
+- Review calendar at /calendar shows 12-month view
+- Reviews table has due dates but no notification system
+- Email infrastructure exists (used for invitations)
+
+### Scope assessment
+- **Size:** Medium
+- **Areas affected:** Backend (notifications), Frontend (calendar UI), Database (notification preferences)
+- **Key files:** internal/api/reviews.go, web/src/pages/Calendar.tsx, db/queries/notifications.sql
+
+### Proposed approach
+- Add notification_preferences table with per-user settings
+- Cron job checks for upcoming review deadlines daily
+- Send email + in-app notification 3 days before due date
+
+### Open questions
+1. Should notifications be per-review or per-user global setting?
+2. What's the notification window — 3 days? 7 days? Configurable?
+3. Should we notify the reviewer, the SOP author, or both?
+
+### Risks / Dependencies
+- Email sending is async; need to handle failures gracefully
+- Calendar UI currently has no notification indicators
+</code></pre>
+
+        <p><strong>This is where I do my actual work.</strong> I answer the open questions, push back on scope, redirect the approach. The AI is doing research; I&rsquo;m making product decisions.</p>
+
+        <h3>Step 5: Split if needed</h3>
+
+        <p>The AI assesses whether the issue should be broken into subtasks. The heuristic is practical:</p>
+
+        <ul>
+          <li>Touches 3+ distinct areas? Split.</li>
+          <li>Would take more than ~2 hours of autonomous work? Split.</li>
+          <li>Has independent pieces that could be parallelized? Split.</li>
+        </ul>
+
+        <p>If splitting is warranted, it proposes a breakdown:</p>
+
+<pre><code class="language-markdown">## Suggested subtask breakdown
+
+1. **Add notification preferences table** — Migration + sqlc queries + API endpoint
+2. **Build notification engine** — Cron job, email sending, in-app notifications
+3. **Calendar UI notifications** — Indicators on calendar, notification preferences page
+
+Each subtask will be independently implementable by /work-issue.
+</code></pre>
+
+        <p>I approve, reject, or modify the breakdown. Nothing gets created until I say so.</p>
+
+        <h3>Step 6: Write the refined spec</h3>
+
+        <p>The AI writes a complete description using a consistent template:</p>
+
+<pre><code class="language-markdown">## Summary
+Add notification system for upcoming review deadlines.
+
+## Acceptance criteria
+- [ ] Users can set notification preferences (email, in-app, both, none)
+- [ ] System checks for reviews due within 3 days, daily at 8am
+- [ ] Reviewers receive email notification with review link
+- [ ] Calendar page shows notification indicator on upcoming reviews
+- [ ] Notification preferences accessible from user profile
+
+## Technical approach
+- **Backend:** New notification_preferences table, cron job in cmd/server/
+- **Frontend:** NotificationBadge component on Calendar, preferences in profile
+- **Database:** migration 000042_add_notification_preferences.up.sql
+
+## Files likely affected
+- `internal/api/notifications.go` — New handler
+- `db/queries/notifications.sql` — New queries
+- `web/src/pages/Calendar.tsx` — Add notification indicators
+- `web/src/components/NotificationPreferences.tsx` — New component
+
+## Testing strategy
+- Backend: unit tests for cron job logic, handler tests for preferences API
+- Frontend: Vitest tests for NotificationBadge and preferences form
+
+## Out of scope
+- SMS notifications
+- Custom notification schedules per review
+- Notification history/log page
+</code></pre>
+
+        <p>I review this final spec. If it looks good, I approve.</p>
+
+        <h3>Step 7: Update Linear</h3>
+
+        <p>The AI updates Linear &mdash; writes the refined description, creates subtasks if splitting was approved, moves things to <strong>Todo</strong>. Each subtask gets its own complete spec.</p>
+
+        <p>The parent issue stays <strong>In Progress</strong> if it was split (it auto-completes when all subtasks finish). Individual subtasks go to <strong>Todo</strong>, which is the <code>/work-issue</code> pickup queue.</p>
+
+        <h3>Step 8: Update docs (optional)</h3>
+
+        <p>If the planned work would change the architecture, data model, or API surface, the AI asks if I want to update the relevant files in <code>docs/</code>. I usually say yes &mdash; it&rsquo;s a small overhead that keeps future runs accurate. The AI drafts the doc update, I review it, and it gets applied alongside moving the issue to Todo.</p>
+
+        <h2>The lesson: planning is where the real work happens</h2>
+
+        <p>I almost didn&rsquo;t build this phase. It seemed like unnecessary overhead &mdash; why not just let the AI start coding? Here&rsquo;s what changed my mind:</p>
+
+        <p><strong>It catches scope issues before code exists.</strong> The worst time to discover an issue is too big is after you&rsquo;ve written half of it. Planning forces the &ldquo;this needs splitting&rdquo; conversation up front, when it&rsquo;s free.</p>
+
+        <p><strong>It creates a paper trail.</strong> Every planned issue has acceptance criteria, technical approach, file paths, and testing strategy. When <code>/work-issue</code> picks it up weeks later, the context is right there. When I review the commit, I can check it against the spec.</p>
+
+        <p><strong>It stops the AI from improvising.</strong> Without a spec, the AI will make product decisions for you. It&rsquo;ll add features you didn&rsquo;t ask for, pick approaches you wouldn&rsquo;t choose, skip edge cases you care about. Planning is where I write down what I want so the AI doesn&rsquo;t have to guess later.</p>
+
+        <p><strong>It&rsquo;s faster than it sounds.</strong> A planning session takes 5-10 minutes. I spend my time on the interesting parts &mdash; making decisions, answering questions, deciding what&rsquo;s in and what&rsquo;s out.</p>
+
+        <h2>Mistakes I made and what I&rsquo;d do differently</h2>
+
+        <p><strong>Start from Backlog, not from your head.</strong> Keep your ideas in Linear&rsquo;s Backlog. Let <code>/plan-issue</code> pull from there. This prevents the &ldquo;I&rsquo;ll just quickly add this&rdquo; temptation that leads to unplanned scope.</p>
+
+        <p><strong>Always wait for the open questions.</strong> Don&rsquo;t rush past Step 4. The AI&rsquo;s questions often reveal things I hadn&rsquo;t considered. &ldquo;Should this be per-review or per-user?&rdquo; is a product decision that changes the implementation significantly.</p>
+
+        <p><strong>Split aggressively.</strong> Small, focused issues lead to better autonomous implementation. If an issue touches backend, frontend, and database, that&rsquo;s three subtasks. Each one fits in a single context window.</p>
+
+        <p><strong>The &ldquo;Out of scope&rdquo; section matters more than you&rsquo;d think.</strong> Listing what&rsquo;s NOT included keeps the AI (and me) focused. Without it, <code>/work-issue</code> will sometimes add &ldquo;helpful&rdquo; extras that weren&rsquo;t asked for.</p>
+
+        <hr>
+
+        <nav class="post-nav">
+          <a class="post-nav-prev" href="/blog/posts/ai-assisted-development-loop-not-chat.html">Part 1 &mdash; Overview</a>
+          <span class="post-nav-spacer"></span>
+        </nav>
+      </div>
+
+      <footer class="blog-footer">
+        <p>&copy; Adri&agrave; Cidre &middot; <a href="/">Home</a></p>
+      </footer>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
