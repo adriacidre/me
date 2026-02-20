@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The 8th Specialist: An AI That Breaks Things on Purpose &mdash; Adri&agrave; Cidre</title>
+  <meta name="description" content="An 8th specialist that touches the browser — navigating, clicking, and typing to find bugs that scripted journeys miss. How exploratory testing with Playwright catches what verification alone can't.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://adriacidre.com/blog/posts/explorer-agent-breaks-things-on-purpose.html">
+  <meta property="og:title" content="The 8th Specialist: An AI That Breaks Things on Purpose">
+  <meta property="og:description" content="An 8th specialist that touches the browser — navigating, clicking, and typing to find bugs that scripted journeys miss. How exploratory testing with Playwright catches what verification alone can't.">
+  <meta property="og:image" content="https://adriacidre.com/blog/images/og-default.jpg">
+  <meta property="og:site_name" content="Adri&agrave; Cidre">
+  <meta property="article:published_time" content="2026-02-20">
+  <meta property="article:author" content="Adri&agrave; Cidre">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="The 8th Specialist: An AI That Breaks Things on Purpose">
+  <meta name="twitter:description" content="An 8th specialist that touches the browser — navigating, clicking, and typing to find bugs that scripted journeys miss. How exploratory testing with Playwright catches what verification alone can't.">
+  <meta name="twitter:image" content="https://adriacidre.com/blog/images/og-default.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;600&family=Source+Code+Pro:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="../css/blog.css">
+</head>
+<body>
+  <div class="blog-wrapper">
+    <div class="blog-card">
+      <header class="blog-header">
+        <div class="blog-header-name"><a href="/">Adri&agrave; Cidre</a></div>
+        <nav>
+          <ul class="blog-header-nav">
+            <li><a href="/">Home</a></li>
+            <li><a href="/blog/">Blog</a></li>
+          </ul>
+        </nav>
+      </header>
+
+      <div class="blog-content">
+        <div class="post-meta">
+          <span class="post-meta-date">February 20, 2026</span>
+          <a class="post-meta-series" href="/blog/">AI Development Workflow &mdash; Part 6 of 6</a>
+          <div class="post-meta-tags">
+            <span class="post-meta-tag">ai</span>
+            <span class="post-meta-tag">claude-code</span>
+            <span class="post-meta-tag">qa</span>
+            <span class="post-meta-tag">exploratory-testing</span>
+            <span class="post-meta-tag">agents</span>
+            <span class="post-meta-tag">playwright</span>
+          </div>
+        </div>
+
+        <div class="series-nav">
+          <div class="series-nav-title">AI Development Workflow &mdash; 6-Part Series</div>
+          <ol class="series-nav-list">
+            <li><a href="/blog/posts/ai-assisted-development-loop-not-chat.html">AI-Assisted Development: A Loop, Not a Chat</a></li>
+            <li><a href="/blog/posts/plan-issue-collaborative-planning.html">/plan-issue: Collaborative Planning with AI</a></li>
+            <li><a href="/blog/posts/work-issue-autonomous-implementation.html">/work-issue: Autonomous Implementation</a></li>
+            <li><a href="/blog/posts/qa-run-ai-driven-qa.html">/qa-run: AI-Driven QA That Closes the Loop</a></li>
+            <li><a href="/blog/posts/specialist-agents-different-eyes.html">Specialist Agents: Looking at Every Page with Different Eyes</a></li>
+            <li><span class="current">The 8th Specialist: An AI That Breaks Things on Purpose</span></li>
+          </ol>
+        </div>
+
+        <h1>The 8th Specialist: An AI That Breaks Things on Purpose</h1>
+
+        <p>This is Part 6 of my series on AI-assisted development. <a href="/blog/posts/specialist-agents-different-eyes.html">Part 5</a> covers the specialist model, <a href="/blog/posts/qa-run-ai-driven-qa.html">Part 4</a> covers <code>/qa-run</code>.</p>
+
+        <p>My QA system has a blind spot. The 7 specialists are good at checking what I tell them to check &mdash; but they only look at pages the journey takes them to, doing exactly what the journey says to do. They verify. They don&rsquo;t discover.</p>
+
+        <p>Real QA testers don&rsquo;t just follow scripts. They sit on a page and think: &ldquo;What happens if I click this twice? What if I navigate here directly? What if I submit this form empty?&rdquo; They break things on purpose. That instinct &mdash; poking at things nobody planned for &mdash; is where the best bugs come from.</p>
+
+        <p>So I built an 8th specialist. The Explorer.</p>
+
+        <h2>The blind spot</h2>
+
+        <p>Here&rsquo;s the problem with scripted journeys:</p>
+
+        <p>Journey J07 says &ldquo;Login as reviewer, navigate to /reviews, verify the review queue loads.&rdquo; The QA specialist checks that data is correct. The UX specialist checks that navigation is clear. The security specialist checks that auth is enforced. They all report OK.</p>
+
+        <p>But nobody asks:</p>
+
+        <ul>
+          <li>What happens if the reviewer manually navigates to <code>/admin/users</code>?</li>
+          <li>What happens if you click the &ldquo;Submit Review&rdquo; button twice?</li>
+          <li>What happens if you refresh the page after submitting a form?</li>
+          <li>What happens if you type <code>&lt;script&gt;alert('xss')&lt;/script&gt;</code> into the search box?</li>
+        </ul>
+
+        <p>These are the things that a QA person would try instinctively. My journeys don&rsquo;t cover them because I&rsquo;d have to think of every possible edge case when writing each journey &mdash; and I won&rsquo;t. Nobody does.</p>
+
+        <h2>How the Explorer works</h2>
+
+        <p>The Explorer is different from the other specialists in one important way: it touches the browser.</p>
+
+        <p>The other 7 specialists are passive &mdash; they receive a snapshot of the page state and analyze it. The Explorer is active &mdash; it gets direct access to Playwright and actually clicks things, navigates, types, and observes what happens.</p>
+
+        <p>It runs after the regular specialists finish each step. The flow is:</p>
+
+<pre><code class="language-plaintext">Step N: Do the action &rarr; Capture state &rarr; Run specialists (passive) &rarr; Run Explorer (active) &rarr; Continue</code></pre>
+
+        <p>The Explorer receives the current page state, figures out what&rsquo;s interesting to probe, does 5-6 experiments, takes screenshots of anything unexpected, then navigates back to where it started so the journey can continue.</p>
+
+        <h3>What it probes</h3>
+
+        <p>I split the probes into two categories based on whether they can corrupt state:</p>
+
+        <p><strong>Non-destructive (safe at every step):</strong></p>
+
+        <ul>
+          <li><strong>Authorization probing</strong> &mdash; navigate to routes the current role shouldn&rsquo;t access. If I&rsquo;m logged in as a clinician, try <code>/admin/users</code>, <code>/templates</code>, <code>/reviews</code>. Does the app redirect? Does it flash unauthorized content before redirecting?</li>
+          <li><strong>Navigation chaos</strong> &mdash; hit the browser back button, refresh the page, navigate to a nonexistent route. Does the app handle it or does it break?</li>
+          <li><strong>UI edge cases</strong> &mdash; click disabled buttons (are they actually disabled?), resize to mobile (375px), click the same button twice. Things users do that developers don&rsquo;t test.</li>
+          <li><strong>Input boundaries</strong> &mdash; type <code>&lt;script&gt;</code> into search boxes, paste 10,000 characters into text fields, search with empty strings. Not to exploit anything, just to see if the app handles it.</li>
+          <li><strong>Silent errors</strong> &mdash; check the console for errors the UI swallowed, check network requests for 4xx/5xx responses that never showed an error message to the user.</li>
+        </ul>
+
+        <p><strong>Destructive (end of journey only):</strong></p>
+
+        <ul>
+          <li><strong>Form abuse</strong> &mdash; submit forms empty, with whitespace, with extreme values. Submit the same form twice rapidly.</li>
+          <li><strong>State disruption</strong> &mdash; clear the auth token from localStorage without navigating away. Does the page crash? Modify the user role in localStorage. Does the UI re-render with wrong permissions?</li>
+          <li><strong>Delete flows</strong> &mdash; do destructive actions have confirmation dialogs?</li>
+        </ul>
+
+        <p>The destructive probes only run at the end of the journey (when corrupting state doesn&rsquo;t matter) or when you explicitly opt in with <code>--explore=full</code>.</p>
+
+        <h2>Why not a separate browser?</h2>
+
+        <p>My first idea was to run the Explorer in a parallel browser tab while the main journey continues. More efficient, right?</p>
+
+        <p>No &mdash; it&rsquo;s worse. If the Explorer is clicking around in tab 2 while the journey advances in tab 1, you get race conditions. The Explorer deletes a record, the journey tries to access it, the journey fails. Now you have a false bug report that wastes debugging time.</p>
+
+        <p>Same browser, same window, sequential. The Explorer runs after each step, does its thing, restores state, and hands control back. Slower, but the findings are real.</p>
+
+        <h2>The state restoration problem</h2>
+
+        <p>There&rsquo;s a subtlety: the Explorer itself can break things for the next step. If the Explorer navigates to <code>/admin/users</code> at step 5 to test authorization, and then step 6 expects to be on <code>/reviews</code>, the journey breaks.</p>
+
+        <p>The solution is simple: the Explorer records the current URL before probing and navigates back when it&rsquo;s done. If it modified localStorage, it restores the original values. The rule is: after the Explorer finishes, the page must be in the exact state it was before.</p>
+
+        <p>This is why the non-destructive/destructive split matters. Non-destructive probes (navigating, clicking, typing into search boxes) can be undone by navigating back. Destructive probes (submitting forms, deleting records) change server state &mdash; you can&rsquo;t un-submit a review. Those only run when state doesn&rsquo;t matter anymore.</p>
+
+        <h2>The finding format</h2>
+
+        <p>This is the part I care about most. Every Explorer finding needs to be reproducible by whoever fixes it. Not &ldquo;I found a bug somewhere&rdquo; &mdash; exact steps to get from a clean state to the broken state.</p>
+
+        <p>Here&rsquo;s what an Explorer finding looks like:</p>
+
+<pre><code class="language-markdown">[EXP-BUG] Double-submit creates duplicate review
+
+- Page: /reviews/15
+- Role: reviewer@test.com
+
+### Reproduction Steps
+1. Navigate to http://localhost:5173/reviews/15
+2. Fill review form (status: "approved", comment: "LGTM")
+3. Click "Enviar Revision" button
+4. Immediately click "Enviar Revision" again (within 500ms)
+
+### Observed
+Two review entries created, toast shown twice, review count incremented by 2
+
+### Expected
+Button should disable after first click, or second request should be idempotent
+
+### Evidence
+Screenshot: qa/reports/J04-step8-explore-double-submit.png
+Console: no errors
+Network: two POST /api/reviews/15/submit (both 200)</code></pre>
+
+        <p>With that, a developer (or <code>/work-issue</code>) can:</p>
+
+        <ol>
+          <li>Reproduce it in 30 seconds</li>
+          <li>Write a test that does exactly those steps</li>
+          <li>Verify the fix prevents the duplicate</li>
+        </ol>
+
+        <p>Compare that to a typical bug report: &ldquo;Sometimes reviews get duplicated.&rdquo; The Explorer doesn&rsquo;t just find the bug &mdash; it writes the reproduction recipe.</p>
+
+        <h2>How to use it</h2>
+
+        <p>The Explorer is opt-in. It doesn&rsquo;t run unless you ask for it:</p>
+
+<pre><code class="language-bash">/qa-run 07                    # Normal run, no exploration
+/qa-run 07 --explore          # Normal run + non-destructive probes at each step
+/qa-run 07 --explore=full     # Normal run + all probes including destructive</code></pre>
+
+        <p>I kept it opt-in because it adds time. Each step gets 5-6 extra browser interactions &mdash; navigating to unauthorized routes, resizing viewport, typing into inputs, clicking things. On a 14-step journey, that&rsquo;s 70-84 extra actions. The trade-off is time for coverage.</p>
+
+        <p>My pattern: I run journeys normally most of the time. Once a week, or after a big batch of changes, I run with <code>--explore</code> to see what falls out. The first run on a new feature page tends to find the most interesting stuff.</p>
+
+        <h2>What it catches in practice</h2>
+
+        <p>I&rsquo;m still early with this, but the kinds of things the Explorer is designed to find:</p>
+
+        <p><strong>Authorization gaps.</strong> Navigate to <code>/admin/users</code> as a clinician. The route redirects &mdash; but does it flash the page content for a frame before redirecting? That&rsquo;s a [SEC-WARNING] even if the user ultimately can&rsquo;t stay on the page.</p>
+
+        <p><strong>Missing error handling.</strong> Search for <code>&lt;script&gt;alert(1)&lt;/script&gt;</code> in the SOP library. The search works, returns zero results. But does the console show an unhandled error? Does the network show a 500? The UI might look fine while the backend is choking.</p>
+
+        <p><strong>Double-submit bugs.</strong> Click a submit button twice. Most forms don&rsquo;t disable the button after first click. If the backend isn&rsquo;t idempotent, you get duplicate records.</p>
+
+        <p><strong>Mobile breakage.</strong> Resize to 375x667 and check if the layout holds. Tables overflow, modals go off-screen, buttons stack on top of each other. This happens on almost every page that wasn&rsquo;t specifically designed for mobile.</p>
+
+        <p><strong>Back button state.</strong> Click the back button after navigating from a list to a detail page. Does the list restore its scroll position? Its filter state? Or does it reload from scratch?</p>
+
+        <h2>How findings flow through the system</h2>
+
+        <p>Explorer findings have their own severity scale: EXP-BLOCKER, EXP-BUG, EXP-WARNING, EXP-SUGGESTION, EXP-OK.</p>
+
+        <p>They show up in the QA report alongside the regular specialist findings. When I run <code>/qa-import</code>, they get the same treatment &mdash; deduplicated, checked against existing Linear issues, classified as Simple or Complex, and created as issues with the full reproduction steps in the description.</p>
+
+        <p>The loop stays the same:</p>
+
+<pre><code class="language-plaintext">/qa-run --explore  &rarr;  report with explorer findings  &rarr;  /qa-import  &rarr;  Linear issues  &rarr;  /plan-issue  &rarr;  /work-issue  &rarr;  /qa-run --explore</code></pre>
+
+        <p>The difference is that now the QA step doesn&rsquo;t just verify what I thought to test &mdash; it also discovers what I didn&rsquo;t.</p>
+
+        <h2>Limitations</h2>
+
+        <p><strong>It&rsquo;s slow.</strong> Exploration adds real time. Non-destructive probes at every step of a 14-step journey adds maybe 10-15 minutes. Not a problem for weekly runs. Not great for quick smoke tests. That&rsquo;s why it&rsquo;s opt-in.</p>
+
+        <p><strong>It can&rsquo;t try everything.</strong> 5-6 probes per step is a budget, not exhaustive coverage. The Explorer picks probes that seem relevant to the page (forms get input probes, lists get filter probes). It might miss something a more thorough pass would catch.</p>
+
+        <p><strong>False positives will happen.</strong> The Explorer might flag a &ldquo;bug&rdquo; that&rsquo;s actually expected behavior. A 404 page that intentionally shows a custom design might get flagged as a navigation issue. I expect to spend time triaging findings, especially early on.</p>
+
+        <p>One thing that might sound like a limitation but isn&rsquo;t: the Explorer re-checks things it already found. It&rsquo;ll test the same authorization redirect every run. That&rsquo;s actually the point &mdash; it doubles as regression detection. If someone accidentally removes an auth guard, the Explorer catches it next run.</p>
+
+        <h2>The bigger point</h2>
+
+        <p>The 7 scripted specialists tell me &ldquo;the things we built work as specified.&rdquo; The 8th tells me &ldquo;here&rsquo;s what happens when people don&rsquo;t follow the script.&rdquo;</p>
+
+        <p>The difference matters. My scripted journeys have been stable for weeks &mdash; they pass, the app works as designed. But the first time I ran the Explorer on the review workflow, it found that submitting a review form and immediately clicking back left the review in a half-committed state. The QA specialist had been reporting [OK] on that step for every run. It only breaks when you do something the journey doesn&rsquo;t say to do.</p>
+
+        <p>That&rsquo;s the class of bug I never write tests for. The stuff that only surfaces when a real user does something I didn&rsquo;t anticipate. And instead of a vague &ldquo;sometimes reviews get stuck,&rdquo; the Explorer handed me exact reproduction steps, a screenshot, and the network trace. That finding became a Linear issue, got picked up by <code>/work-issue</code>, and was fixed the same day.</p>
+
+        <p>It&rsquo;s not manual QA. It&rsquo;s not automated testing. It&rsquo;s somewhere in between &mdash; an AI that thinks like a tester, acts on its own, and writes bug reports good enough to implement fixes from.</p>
+
+        <hr>
+
+        <nav class="post-nav">
+          <a class="post-nav-prev" href="/blog/posts/specialist-agents-different-eyes.html">Part 5 &mdash; Specialist Agents: Different Eyes</a>
+          <a class="post-nav-next" href="/blog/">Back to series overview</a>
+        </nav>
+      </div>
+
+      <footer class="blog-footer">
+        <p>&copy; Adri&agrave; Cidre &middot; <a href="/">Home</a></p>
+      </footer>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
