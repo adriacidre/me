@@ -75,7 +75,7 @@
         <h3>Step 1: Fetch the issue</h3>
 
 <pre><code class="language-bash">/plan-issue                    # Auto-pick oldest Backlog issue
-/plan-issue --id=BROT-42       # Plan a specific issue
+/plan-issue --id=PROJ-42       # Plan a specific issue
 </code></pre>
 
         <p>The AI connects to Linear via MCP, grabs the issue, and shows me what we&rsquo;re working with &mdash; title, priority, existing description (often sparse or empty).</p>
@@ -100,31 +100,31 @@
 
         <p>The AI presents its findings in a structured format:</p>
 
-<pre><code class="language-markdown">## Analysis: Add review calendar notifications
+<pre><code class="language-markdown">## Analysis: Add export functionality for reports
 
 ### What exists today
-- Review calendar at /calendar shows 12-month view
-- Reviews table has due dates but no notification system
-- Email infrastructure exists (used for invitations)
+- Reports page at /reports shows filterable list of records
+- Reports table has status, date range, and category fields
+- PDF generation library already in use (for invoices)
 
 ### Scope assessment
 - **Size:** Medium
-- **Areas affected:** Backend (notifications), Frontend (calendar UI), Database (notification preferences)
-- **Key files:** internal/api/reviews.go, web/src/pages/Calendar.tsx, db/queries/notifications.sql
+- **Areas affected:** Backend (export endpoint), Frontend (export UI), Database (export job tracking)
+- **Key files:** internal/api/reports.go, web/src/pages/Reports.tsx, db/queries/exports.sql
 
 ### Proposed approach
-- Add notification_preferences table with per-user settings
-- Cron job checks for upcoming review deadlines daily
-- Send email + in-app notification 3 days before due date
+- Add exports table to track async export jobs
+- New API endpoint triggers export generation in background
+- Support CSV and PDF formats, download via signed URL
 
 ### Open questions
-1. Should notifications be per-review or per-user global setting?
-2. What's the notification window — 3 days? 7 days? Configurable?
-3. Should we notify the reviewer, the SOP author, or both?
+1. Should exports include all visible columns or let users pick?
+2. What's the max row limit — 10k? 50k? No limit?
+3. Should we support scheduled/recurring exports?
 
 ### Risks / Dependencies
-- Email sending is async; need to handle failures gracefully
-- Calendar UI currently has no notification indicators
+- Large exports need background processing; can't block the request
+- PDF generation for large datasets may need pagination
 </code></pre>
 
         <p><strong>This is where I do my actual work.</strong> I answer the open questions, push back on scope, redirect the approach. The AI is doing research; I&rsquo;m making product decisions.</p>
@@ -143,9 +143,9 @@
 
 <pre><code class="language-markdown">## Suggested subtask breakdown
 
-1. **Add notification preferences table** — Migration + sqlc queries + API endpoint
-2. **Build notification engine** — Cron job, email sending, in-app notifications
-3. **Calendar UI notifications** — Indicators on calendar, notification preferences page
+1. **Add exports table and API endpoint** — Migration + sqlc queries + handler
+2. **Build export generation worker** — Background job, CSV/PDF rendering, file storage
+3. **Export UI** — Export button, format picker, download status indicator
 
 Each subtask will be independently implementable by /work-issue.
 </code></pre>
@@ -157,34 +157,34 @@ Each subtask will be independently implementable by /work-issue.
         <p>The AI writes a complete description using a consistent template:</p>
 
 <pre><code class="language-markdown">## Summary
-Add notification system for upcoming review deadlines.
+Add export functionality for the reports page (CSV and PDF).
 
 ## Acceptance criteria
-- [ ] Users can set notification preferences (email, in-app, both, none)
-- [ ] System checks for reviews due within 3 days, daily at 8am
-- [ ] Reviewers receive email notification with review link
-- [ ] Calendar page shows notification indicator on upcoming reviews
-- [ ] Notification preferences accessible from user profile
+- [ ] Users can trigger an export from the reports page
+- [ ] Format picker supports CSV and PDF
+- [ ] Large exports run in background with progress indicator
+- [ ] Completed exports available for download via signed URL
+- [ ] Export history visible in user's account section
 
 ## Technical approach
-- **Backend:** New notification_preferences table, cron job in cmd/server/
-- **Frontend:** NotificationBadge component on Calendar, preferences in profile
-- **Database:** migration 000042_add_notification_preferences.up.sql
+- **Backend:** New exports table, background worker in cmd/server/
+- **Frontend:** ExportButton component on Reports, status polling
+- **Database:** migration 000042_add_exports.up.sql
 
 ## Files likely affected
-- `internal/api/notifications.go` — New handler
-- `db/queries/notifications.sql` — New queries
-- `web/src/pages/Calendar.tsx` — Add notification indicators
-- `web/src/components/NotificationPreferences.tsx` — New component
+- `internal/api/exports.go` — New handler
+- `db/queries/exports.sql` — New queries
+- `web/src/pages/Reports.tsx` — Add export button
+- `web/src/components/ExportStatus.tsx` — New component
 
 ## Testing strategy
-- Backend: unit tests for cron job logic, handler tests for preferences API
-- Frontend: Vitest tests for NotificationBadge and preferences form
+- Backend: unit tests for export worker, handler tests for export API
+- Frontend: Vitest tests for ExportButton and status indicator
 
 ## Out of scope
-- SMS notifications
-- Custom notification schedules per review
-- Notification history/log page
+- Scheduled/recurring exports
+- Custom column selection
+- Export sharing between users
 </code></pre>
 
         <p>I review this final spec. If it looks good, I approve.</p>
@@ -215,7 +215,7 @@ Add notification system for upcoming review deadlines.
 
         <p><strong>Start from Backlog, not from your head.</strong> Keep your ideas in Linear&rsquo;s Backlog. Let <code>/plan-issue</code> pull from there. This prevents the &ldquo;I&rsquo;ll just quickly add this&rdquo; temptation that leads to unplanned scope.</p>
 
-        <p><strong>Always wait for the open questions.</strong> Don&rsquo;t rush past Step 4. The AI&rsquo;s questions often reveal things I hadn&rsquo;t considered. &ldquo;Should this be per-review or per-user?&rdquo; is a product decision that changes the implementation significantly.</p>
+        <p><strong>Always wait for the open questions.</strong> Don&rsquo;t rush past Step 4. The AI&rsquo;s questions often reveal things I hadn&rsquo;t considered. &ldquo;Should exports include all columns or let users pick?&rdquo; is a product decision that changes the implementation significantly.</p>
 
         <p><strong>Split aggressively.</strong> Small, focused issues lead to better autonomous implementation. If an issue touches backend, frontend, and database, that&rsquo;s three subtasks. Each one fits in a single context window.</p>
 
