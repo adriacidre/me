@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>25 Issues Overnight: Batch AI That Doesn&rsquo;t Need You &mdash; Adri&agrave; Cidre</title>
+  <meta name="description" content="The leap from AI-assisted coding to autonomous batch processing. Fresh context per task, filesystem locks, model routing, and orchestration that runs while you sleep.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://adriacidre.com/blog/posts/batch-ai-orchestration-overnight.html">
+  <meta property="og:title" content="25 Issues Overnight: Batch AI That Doesn't Need You">
+  <meta property="og:description" content="The leap from AI-assisted coding to autonomous batch processing. Fresh context per task, filesystem locks, model routing, and orchestration that runs while you sleep.">
+  <meta property="og:image" content="https://adriacidre.com/blog/images/og-default.jpg">
+  <meta property="og:site_name" content="Adri&agrave; Cidre">
+  <meta property="article:published_time" content="2026-03-19">
+  <meta property="article:author" content="Adri&agrave; Cidre">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="25 Issues Overnight: Batch AI That Doesn't Need You">
+  <meta name="twitter:description" content="The leap from AI-assisted coding to autonomous batch processing. Fresh context per task, filesystem locks, model routing, and orchestration that runs while you sleep.">
+  <meta name="twitter:image" content="https://adriacidre.com/blog/images/og-default.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;600&family=Source+Code+Pro:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="../css/blog.css">
+</head>
+<body>
+  <div class="blog-wrapper">
+    <div class="blog-card">
+      <header class="blog-header">
+        <div class="blog-header-name"><a href="/">Adri&agrave; Cidre</a></div>
+        <nav>
+          <ul class="blog-header-nav">
+            <li><a href="/">Home</a></li>
+            <li><a href="/blog/">Blog</a></li>
+          </ul>
+        </nav>
+      </header>
+
+      <div class="blog-content">
+        <div class="post-meta">
+          <span class="post-meta-date">March 19, 2026</span>
+          <div class="post-meta-tags">
+            <span class="post-meta-tag">autonomous-ai-agents</span>
+            <span class="post-meta-tag">agentic-workflows</span>
+            <span class="post-meta-tag">batch-processing-llm</span>
+            <span class="post-meta-tag">agent-orchestration</span>
+            <span class="post-meta-tag">ci-cd-ai</span>
+            <span class="post-meta-tag">llm-cost-optimization</span>
+          </div>
+        </div>
+
+        <h1>25 Issues Overnight: Batch AI That Doesn&rsquo;t Need You</h1>
+
+        <p>The leap from &ldquo;AI helps me code&rdquo; to &ldquo;AI codes while I sleep&rdquo; wasn&rsquo;t the AI. The model was already capable of writing code, running tests, and committing. What was missing was the orchestration &mdash; the loop that feeds it tasks one by one, monitors progress, handles failures, and moves on to the next issue without human intervention.</p>
+
+        <p>I wrote about the <a href="ai-assisted-development-loop-not-chat.html">Plan, Work, QA loop</a> in an earlier post. This post is about the mechanics of running that loop unattended &mdash; at scale, overnight, across dozens of issues.</p>
+
+        <h2>Fresh context per task</h2>
+
+        <p>The single most important design decision in batch AI processing: every task gets its own context. No shared state between issues. No accumulated conversation history from previous tasks. Clean slate.</p>
+
+        <p>I learned this the hard way. Early on, I tried processing issues in a single long-running session. Issue 3 would fail because the AI was still thinking about the refactoring it did in issue 2. Variable names from one task would bleed into another. A failed test in issue 5 would make the AI cautious for issues 6 through 10, producing unnecessarily conservative code.</p>
+
+<pre><code class="language-go">// ProcessBatch runs a list of tasks sequentially, each in a fresh
+// AI context. Returns results for all tasks, including failures.
+func ProcessBatch(ctx context.Context, tasks []Task, config BatchConfig) []TaskResult {
+    results := make([]TaskResult, 0, len(tasks))
+
+    for i, task := range tasks {
+        log.Printf("[%d/%d] Processing: %s", i+1, len(tasks), task.Title)
+
+        // Each task gets a fresh context — no shared state
+        taskCtx, cancel := context.WithTimeout(ctx, config.TaskTimeout)
+
+        result := processOneTask(taskCtx, task, config)
+        cancel()
+
+        results = append(results, result)
+
+        if result.Status == StatusFailed && config.StopOnError {
+            log.Printf("Stopping batch: task %q failed", task.Title)
+            break
+        }
+
+        // Notify progress
+        if config.NotifyURL != "" {
+            notifyProgress(config.NotifyURL, task.Title, result.Status, i+1, len(tasks))
+        }
+    }
+
+    return results
+}</code></pre>
+
+        <p>Fresh context means each task gets exactly the information it needs: the task spec, the relevant code paths, and the project&rsquo;s architecture docs. Nothing else. The AI doesn&rsquo;t know what it worked on five minutes ago, and that&rsquo;s a feature.</p>
+
+        <h2>The batch loop</h2>
+
+        <p>The orchestrator is a shell script that coordinates the full lifecycle: fetch tasks, launch AI agents, monitor progress, handle retries, report results.</p>
+
+<pre><code class="language-bash">#!/bin/bash
+set -euo pipefail
+
+LOCK_FILE="/tmp/batch-processor.lock"
+MAX_ISSUES=${1:-10}
+STOP_ON_ERROR=${2:-false}
+
+# Filesystem lock prevents overlapping runs
+if [ -f "$LOCK_FILE" ]; then
+    pid=$(cat "$LOCK_FILE")
+    if kill -0 "$pid" 2>/dev/null; then
+        echo "Batch already running (PID $pid). Exiting."
+        exit 1
+    fi
+    echo "Stale lock file found. Cleaning up."
+    rm "$LOCK_FILE"
+fi
+echo $$ > "$LOCK_FILE"
+trap 'rm -f "$LOCK_FILE"' EXIT
+
+# Fetch queued tasks from the issue tracker
+ISSUES=$(fetch-todo-issues --limit "$MAX_ISSUES" --format json)
+TOTAL=$(echo "$ISSUES" | jq length)
+
+echo "Processing $TOTAL issues..."
+
+SUCCEEDED=0
+FAILED=0
+
+for i in $(seq 0 $((TOTAL - 1))); do
+    ISSUE_ID=$(echo "$ISSUES" | jq -r ".[$i].id")
+    ISSUE_TITLE=$(echo "$ISSUES" | jq -r ".[$i].title")
+
+    echo ""
+    echo "=== [$((i+1))/$TOTAL] $ISSUE_TITLE ==="
+
+    # Launch AI agent with fresh context, capture exit code
+    if process-issue --id "$ISSUE_ID" --timeout 30m; then
+        SUCCEEDED=$((SUCCEEDED + 1))
+        echo "✓ Completed: $ISSUE_TITLE"
+    else
+        FAILED=$((FAILED + 1))
+        echo "✗ Failed: $ISSUE_TITLE"
+
+        if [ "$STOP_ON_ERROR" = "true" ]; then
+            echo "Stopping on error."
+            break
+        fi
+    fi
+done
+
+echo ""
+echo "=== Batch complete: $SUCCEEDED succeeded, $FAILED failed ==="
+
+# Send summary notification
+curl -s -d "Batch complete: $SUCCEEDED/$TOTAL succeeded, $FAILED failed" \
+    "${NOTIFY_URL:-}"</code></pre>
+
+        <p>The key elements:</p>
+
+        <ul>
+          <li><strong>Filesystem lock.</strong> A PID file in <code>/tmp</code> prevents two batch runs from overlapping. The trap ensures cleanup on exit, and the stale-lock check handles crashes.</li>
+          <li><strong>Sequential processing.</strong> One issue at a time. Parallel processing sounds faster, but concurrent AI agents writing to the same codebase create merge conflicts and race conditions.</li>
+          <li><strong>Failure isolation.</strong> A failed task doesn&rsquo;t kill the batch (unless <code>--stop-on-error</code> is set). The AI comments on the issue explaining what went wrong, and the batch moves on.</li>
+          <li><strong>Progress notifications.</strong> Each task completion sends a push notification. I get pings on my phone as issues complete overnight.</li>
+        </ul>
+
+        <h2>Scheduled runs</h2>
+
+        <p>The batch script runs on a cron schedule. I typically queue up issues in the afternoon (planning phase), then the batch processes them overnight.</p>
+
+<pre><code class="language-plaintext"># Process queued issues at 11pm, Monday through Friday
+0 23 * * 1-5  cd /path/to/project && ./scripts/batch-process.sh 25 >> /var/log/batch.log 2>&1</code></pre>
+
+        <p>The number (25) is the maximum issues per run. In practice, each issue takes 10&ndash;30 minutes depending on complexity, so 25 issues fills a full overnight window. If some fail, they stay in the queue for the next run &mdash; or I re-plan them with more detail the next afternoon.</p>
+
+        <h2>Tenant-scoped processing</h2>
+
+        <p>For systems that serve multiple organizations, batch processing needs to respect tenant boundaries. Each batch job processes one tenant at a time, and the AI context only includes that tenant&rsquo;s configuration, documents, and data.</p>
+
+<pre><code class="language-go">// RunTenantBatch processes all queued tasks for a single tenant.
+// Each tenant's tasks run in isolation — no cross-tenant data leaks.
+func RunTenantBatch(ctx context.Context, tenantID string, config BatchConfig) (*BatchReport, error) {
+    // Load tenant-specific configuration
+    tenantConfig, err := loadTenantConfig(ctx, tenantID)
+    if err != nil {
+        return nil, fmt.Errorf("loading tenant config: %w", err)
+    }
+
+    // Fetch only this tenant's queued tasks
+    tasks, err := fetchQueuedTasks(ctx, tenantID)
+    if err != nil {
+        return nil, fmt.Errorf("fetching tasks: %w", err)
+    }
+
+    // Select model based on tenant tier
+    model := selectModel(tenantConfig.Tier, config.CostBudget)
+
+    report := &BatchReport{
+        TenantID:  tenantID,
+        StartedAt: time.Now(),
+    }
+
+    for _, task := range tasks {
+        result := processOneTask(ctx, task, model, tenantConfig)
+        report.Results = append(report.Results, result)
+    }
+
+    report.FinishedAt = time.Now()
+    return report, nil
+}</code></pre>
+
+        <p>This prevents a subtle but dangerous bug: without tenant scoping, the AI might reference documents or patterns from one organization while working on another&rsquo;s tasks. In a multi-tenant system, this is a data leak.</p>
+
+        <h2>Model routing</h2>
+
+        <p>Not all tasks need the same model. A simple text formatting fix doesn&rsquo;t need the most capable (and expensive) model. A complex architectural change does. Model routing matches task complexity to model capability and cost.</p>
+
+<pre><code class="language-go">// SelectModel chooses the appropriate AI model based on task
+// priority and the remaining cost budget for this batch run.
+func SelectModel(priority TaskPriority, remainingBudget float64) string {
+    switch {
+    case priority == PriorityCritical:
+        // Critical tasks always get the best model
+        return ModelHighCapability
+
+    case remainingBudget < LowBudgetThreshold:
+        // Running low on budget — use the efficient model
+        return ModelCostEfficient
+
+    case priority == PriorityHigh:
+        return ModelHighCapability
+
+    default:
+        // Routine tasks use the cost-efficient model
+        return ModelCostEfficient
+    }
+}
+
+const (
+    ModelHighCapability = "claude-sonnet-4-20250514"
+    ModelCostEfficient  = "claude-haiku-4-5-20251001"
+    LowBudgetThreshold  = 5.0 // dollars remaining
+)</code></pre>
+
+        <p>The routing is simple: critical and high-priority tasks get the capable model, everything else gets the efficient one. There&rsquo;s also a budget guard &mdash; if the batch is running low on its cost budget, even high-priority tasks get the cheaper model. This prevents a bad batch from burning through your entire monthly allocation.</p>
+
+        <p>In practice, about 70% of batch tasks use the cost-efficient model. The quality is good enough for routine implementations, and the cost savings add up. The capable model handles the remaining 30% where the complexity justifies the cost.</p>
+
+        <h2>The technical names I didn&rsquo;t know</h2>
+
+        <ul>
+          <li><strong>Agentic workflows</strong> &mdash; autonomous AI agents that complete multi-step tasks without human intervention. The batch loop is an agentic workflow coordinator.</li>
+          <li><strong>Job scheduling</strong> &mdash; cron-based task execution with locking and failure handling. The same patterns run ETL pipelines, data processing, and now AI batch processing.</li>
+          <li><strong>Batch orchestration</strong> &mdash; coordinating multiple independent jobs with monitoring, retry logic, and progress reporting. Airflow, Luigi, and every workflow engine does this. I just did it with a shell script.</li>
+        </ul>
+
+        <p>The irony is that the most &ldquo;advanced AI&rdquo; part of this system &mdash; the batch orchestrator &mdash; uses the most old-school infrastructure patterns. Cron jobs, PID files, filesystem locks. It works.</p>
+
+        <h2>What doesn&rsquo;t work</h2>
+
+        <ul>
+          <li><strong>Vague specs produce vague implementations.</strong> This is the biggest lesson. In interactive mode, you can course-correct mid-conversation. In batch mode, the AI gets one shot. If the issue spec says &ldquo;improve the dashboard,&rdquo; you get a random interpretation. Batch mode amplifies planning quality &mdash; garbage in, garbage out at scale.</li>
+          <li><strong>Sequential processing is slow.</strong> 25 issues at 15 minutes each = 6+ hours. Parallel processing would be faster, but the AI agents would step on each other&rsquo;s code. I&rsquo;ve experimented with git worktrees for parallel processing, but the merge step introduces its own complexity.</li>
+          <li><strong>Not every failure is retryable.</strong> Some issues fail because the spec is wrong, not because the AI had a bad run. Automatically retrying these wastes time and money. I&rsquo;m still manually reviewing failed issues to decide whether to retry or re-plan.</li>
+          <li><strong>Cost spikes are real.</strong> A batch of 25 complex issues using the capable model can cost $30&ndash;50. Without the budget guard, it&rsquo;s easy to accidentally blow through a week&rsquo;s budget in one overnight run.</li>
+          <li><strong>The cron job doesn&rsquo;t know about holidays.</strong> I&rsquo;ve woken up to 25 completed issues on a day when I had no time to review them. The issues pile up, reviews get rushed, and bugs slip through.</li>
+        </ul>
+
+        <hr>
+
+        <nav class="post-nav">
+          <a href="/blog/">&larr; Back to blog</a>
+          <span class="post-nav-spacer"></span>
+        </nav>
+      </div>
+
+      <footer class="blog-footer">
+        <p>&copy; Adri&agrave; Cidre &middot; <a href="/">Home</a></p>
+      </footer>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
