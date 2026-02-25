@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Boring Stuff That Keeps AI in Production &mdash; Adri&agrave; Cidre</title>
+  <meta name="description" content="Exponential backoff, dual timeouts, SSE heartbeats, idempotency caches. The unglamorous reliability patterns that keep LLM-powered systems running at 3am.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://adriacidre.com/blog/posts/reliability-patterns-ai-production.html">
+  <meta property="og:title" content="The Boring Stuff That Keeps AI in Production">
+  <meta property="og:description" content="Exponential backoff, dual timeouts, SSE heartbeats, idempotency caches. The unglamorous reliability patterns that keep LLM-powered systems running at 3am.">
+  <meta property="og:image" content="https://adriacidre.com/blog/images/og-default.jpg">
+  <meta property="og:site_name" content="Adri&agrave; Cidre">
+  <meta property="article:published_time" content="2026-03-12">
+  <meta property="article:author" content="Adri&agrave; Cidre">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="The Boring Stuff That Keeps AI in Production">
+  <meta name="twitter:description" content="Exponential backoff, dual timeouts, SSE heartbeats, idempotency caches. The unglamorous reliability patterns that keep LLM-powered systems running at 3am.">
+  <meta name="twitter:image" content="https://adriacidre.com/blog/images/og-default.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;600&family=Source+Code+Pro:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="../css/blog.css">
+</head>
+<body>
+  <div class="blog-wrapper">
+    <div class="blog-card">
+      <header class="blog-header">
+        <div class="blog-header-name"><a href="/">Adri&agrave; Cidre</a></div>
+        <nav>
+          <ul class="blog-header-nav">
+            <li><a href="/">Home</a></li>
+            <li><a href="/blog/">Blog</a></li>
+          </ul>
+        </nav>
+      </header>
+
+      <div class="blog-content">
+        <div class="post-meta">
+          <span class="post-meta-date">March 12, 2026</span>
+          <div class="post-meta-tags">
+            <span class="post-meta-tag">production-llm-systems</span>
+            <span class="post-meta-tag">llm-reliability</span>
+            <span class="post-meta-tag">ai-observability</span>
+            <span class="post-meta-tag">llm-error-handling</span>
+            <span class="post-meta-tag">exponential-backoff</span>
+            <span class="post-meta-tag">streaming</span>
+            <span class="post-meta-tag">go</span>
+          </div>
+        </div>
+
+        <h1>The Boring Stuff That Keeps AI in Production</h1>
+
+        <p>Nobody talks about what happens when the AI API returns a 529 at 3am during your batch run. Or when a streaming response stalls mid-sentence. Or when the same request gets submitted twice because the user&rsquo;s browser retried on a timeout.</p>
+
+        <p>These aren&rsquo;t AI problems. They&rsquo;re distributed systems problems wearing an AI hat. And the solutions are the same boring, well-established patterns that have kept web services running for decades. I just had to rediscover them in a new context.</p>
+
+        <h2>Exponential backoff with jitter</h2>
+
+        <p>LLM APIs have rate limits and they have bad days. When you get a 429 (rate limited) or a 5xx (server error), the worst thing you can do is retry immediately &mdash; you add to the pile of requests that caused the problem in the first place.</p>
+
+        <p>The classic fix is exponential backoff: wait 1 second, then 2, then 4, then 8. But if ten clients all get rate-limited at the same time, they all retry at the same intervals &mdash; the thundering herd problem. Adding random jitter breaks up the collision.</p>
+
+<pre><code class="language-go">// RetryWithBackoff retries a function with exponential backoff and jitter.
+// It respects Retry-After headers from the server when available.
+func RetryWithBackoff(ctx context.Context, maxRetries int, fn func() (*http.Response, error)) (*http.Response, error) {
+    var lastErr error
+    baseDelay := 1 * time.Second
+
+    for attempt := 0; attempt <= maxRetries; attempt++ {
+        resp, err := fn()
+        if err == nil && resp.StatusCode < 400 {
+            return resp, nil
+        }
+
+        if resp != nil {
+            // Don't retry client errors (except rate limits)
+            if resp.StatusCode >= 400 && resp.StatusCode < 500 && resp.StatusCode != 429 {
+                return resp, fmt.Errorf("terminal error: %d", resp.StatusCode)
+            }
+
+            // Respect Retry-After header if present
+            if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
+                if seconds, err := strconv.Atoi(retryAfter); err == nil {
+                    select {
+                    case <-time.After(time.Duration(seconds) * time.Second):
+                    case <-ctx.Done():
+                        return nil, ctx.Err()
+                    }
+                    continue
+                }
+            }
+        }
+
+        if attempt == maxRetries {
+            lastErr = fmt.Errorf("max retries exceeded: %w", err)
+            break
+        }
+
+        // Exponential backoff: 1s, 2s, 4s, 8s...
+        delay := baseDelay * time.Duration(1<<uint(attempt))
+        // Add random jitter: 0-500ms
+        jitter := time.Duration(rand.Int63n(500)) * time.Millisecond
+        delay += jitter
+
+        select {
+        case <-time.After(delay):
+        case <-ctx.Done():
+            return nil, ctx.Err()
+        }
+    }
+
+    return nil, lastErr
+}</code></pre>
+
+        <p>The key decisions:</p>
+
+        <ul>
+          <li><strong>400/401/403: don&rsquo;t retry.</strong> These are client errors. Your request is wrong. Retrying the same bad request wastes time and budget.</li>
+          <li><strong>429/5xx: retry.</strong> These are transient. The server is either overloaded or having a bad moment. Back off and try again.</li>
+          <li><strong>Respect Retry-After.</strong> If the server tells you when to come back, listen. It knows better than your exponential formula.</li>
+          <li><strong>Context cancellation.</strong> Every wait is interruptible. If the parent context is cancelled (user navigated away, timeout fired), stop immediately.</li>
+        </ul>
+
+        <h2>Dual streaming timeouts</h2>
+
+        <p>LLM responses are streamed &mdash; they arrive as a sequence of chunks over an open connection. This creates a problem that traditional HTTP timeouts don&rsquo;t handle well: a request can technically be &ldquo;in progress&rdquo; while the stream has stalled.</p>
+
+        <p>I use two independent timeouts:</p>
+
+<pre><code class="language-go">const (
+    // OverallTimeout is the maximum wall-clock time for an entire
+    // streaming response. Prevents hung connections that never close.
+    OverallTimeout = 10 * time.Minute
+
+    // IdleChunkTimeout is the maximum time between consecutive stream
+    // chunks. Detects stalled streams where the connection is alive
+    // but no data is flowing.
+    IdleChunkTimeout = 180 * time.Second
+)
+
+// StreamWithTimeouts reads an SSE stream with both overall and
+// idle timeout enforcement.
+func StreamWithTimeouts(ctx context.Context, body io.Reader, handler func(chunk []byte) error) error {
+    ctx, cancel := context.WithTimeout(ctx, OverallTimeout)
+    defer cancel()
+
+    scanner := bufio.NewScanner(body)
+    for {
+        // Reset idle timer before each read
+        idleTimer := time.NewTimer(IdleChunkTimeout)
+
+        done := make(chan struct{})
+        var line string
+        var scanOk bool
+
+        go func() {
+            scanOk = scanner.Scan()
+            if scanOk {
+                line = scanner.Text()
+            }
+            close(done)
+        }()
+
+        select {
+        case <-done:
+            idleTimer.Stop()
+            if !scanOk {
+                return scanner.Err()
+            }
+            if err := handler([]byte(line)); err != nil {
+                return err
+            }
+        case <-idleTimer.C:
+            return fmt.Errorf("stream idle for %v, assuming stalled", IdleChunkTimeout)
+        case <-ctx.Done():
+            idleTimer.Stop()
+            return ctx.Err()
+        }
+    }
+}</code></pre>
+
+        <ul>
+          <li><strong>Overall timeout (10 minutes)</strong> catches connections that never close. Some LLM responses are legitimately long &mdash; complex prompts with detailed outputs. Ten minutes is generous but finite.</li>
+          <li><strong>Idle chunk timeout (180 seconds)</strong> catches streams that stop producing data. The connection is open, the server hasn&rsquo;t closed it, but nothing is flowing. This happens more often than you&rsquo;d expect &mdash; network issues, upstream load balancer hiccups, provider-side queuing.</li>
+        </ul>
+
+        <p>You need both. The overall timeout alone doesn&rsquo;t catch stalls &mdash; a stalled stream can sit there for 10 minutes doing nothing. The idle timeout alone doesn&rsquo;t prevent extremely long (but active) responses from running forever.</p>
+
+        <h2>SSE heartbeat keepalive</h2>
+
+        <p>Server-Sent Events (SSE) connections have a silent enemy: intermediate proxies. Load balancers, reverse proxies, CDNs &mdash; they all have idle connection timeouts. If no data flows for 30&ndash;60 seconds, the proxy kills the connection.</p>
+
+        <p>LLM responses can have long pauses. The model is &ldquo;thinking&rdquo; &mdash; no tokens are being emitted, but the connection needs to stay alive. The fix is a heartbeat:</p>
+
+<pre><code class="language-go">const HeartbeatInterval = 15 * time.Second
+
+// StartHeartbeat sends SSE comment lines at regular intervals
+// to keep the connection alive through proxies.
+func StartHeartbeat(ctx context.Context, w http.ResponseWriter, flusher http.Flusher) {
+    ticker := time.NewTicker(HeartbeatInterval)
+    defer ticker.Stop()
+
+    for {
+        select {
+        case <-ticker.C:
+            // SSE comment line &mdash; clients ignore these, but proxies
+            // see traffic and keep the connection alive.
+            fmt.Fprintf(w, ": keepalive\n\n")
+            flusher.Flush()
+        case <-ctx.Done():
+            return
+        }
+    }
+}</code></pre>
+
+        <p>A colon-prefixed line in SSE is a comment. Clients are required to ignore it. But to the proxy, it&rsquo;s traffic &mdash; the connection is active. Fifteen seconds is conservative enough to survive most proxy configurations.</p>
+
+        <h2>Graceful degradation</h2>
+
+        <p>LLM responses are unpredictable. You ask for JSON, you get JSON with a preamble. You ask for a specific format, you get something close but not quite. The system needs to handle these gracefully instead of crashing.</p>
+
+<pre><code class="language-go">// ParseStructuredResponse attempts to parse the LLM's response as JSON.
+// If parsing fails, it retries with an enforcement prompt. If that also
+// fails, it returns a fallback response.
+func ParseStructuredResponse(
+    ctx context.Context,
+    client *Client,
+    rawResponse string,
+    messages []Message,
+) (*StructuredResponse, error) {
+    // Attempt 1: parse directly
+    var result StructuredResponse
+    if err := json.Unmarshal([]byte(rawResponse), &result); err == nil {
+        return &result, nil
+    }
+
+    // Attempt 2: extract JSON from markdown code blocks
+    extracted := extractJSONFromMarkdown(rawResponse)
+    if extracted != "" {
+        if err := json.Unmarshal([]byte(extracted), &result); err == nil {
+            return &result, nil
+        }
+    }
+
+    // Attempt 3: retry with enforcement prompt
+    messages = append(messages, Message{
+        Role:    "user",
+        Content: "Your previous response was not valid JSON. Please respond with ONLY valid JSON, no markdown, no explanation.",
+    })
+    retryResponse, err := client.Complete(ctx, messages)
+    if err != nil {
+        return nil, fmt.Errorf("enforcement retry failed: %w", err)
+    }
+    if err := json.Unmarshal([]byte(retryResponse), &result); err == nil {
+        return &result, nil
+    }
+
+    // Fallback: return what we have with an error flag
+    return &StructuredResponse{
+        Content: rawResponse,
+        Error:   "failed to parse structured response after retries",
+    }, nil
+}</code></pre>
+
+        <p>The chain is: try to parse &rarr; try to extract from markdown &rarr; retry with enforcement &rarr; fall back cleanly. Each step is cheaper than the next. Most responses parse on the first attempt. The enforcement retry costs one more LLM call but usually works. The fallback means the user gets <em>something</em> rather than an error screen.</p>
+
+        <h2>Idempotency and deduplication</h2>
+
+        <p>Users double-click submit buttons. Browsers retry on timeout. Flaky networks cause duplicate requests. In a traditional CRUD app, this might create a duplicate record. In an AI system, it means two LLM calls for the same prompt &mdash; double the cost, and potentially two conflicting responses shown to the user.</p>
+
+<pre><code class="language-go">// IdempotencyCache prevents duplicate processing of identical requests
+// within a time window using SHA256 message fingerprinting.
+type IdempotencyCache struct {
+    mu      sync.RWMutex
+    entries map[string]*CacheEntry
+    ttl     time.Duration
+}
+
+type CacheEntry struct {
+    Response  string
+    CreatedAt time.Time
+}
+
+// CheckOrStore returns a cached response if this message fingerprint
+// was seen within the TTL window. Otherwise, stores a placeholder
+// and returns nil (indicating the caller should proceed).
+func (c *IdempotencyCache) CheckOrStore(tenantID string, messages []Message) *string {
+    fingerprint := c.computeFingerprint(tenantID, messages)
+
+    c.mu.RLock()
+    entry, exists := c.entries[fingerprint]
+    c.mu.RUnlock()
+
+    if exists && time.Since(entry.CreatedAt) < c.ttl {
+        return &entry.Response
+    }
+
+    c.mu.Lock()
+    c.entries[fingerprint] = &CacheEntry{CreatedAt: time.Now()}
+    c.mu.Unlock()
+
+    return nil
+}
+
+func (c *IdempotencyCache) computeFingerprint(tenantID string, messages []Message) string {
+    h := sha256.New()
+    h.Write([]byte(tenantID))
+    for _, msg := range messages {
+        h.Write([]byte(msg.Role))
+        h.Write([]byte(msg.Content))
+    }
+    return hex.EncodeToString(h.Sum(nil))
+}</code></pre>
+
+        <p>The fingerprint is a SHA256 hash of the tenant ID and message contents. If the same tenant sends the same messages within the TTL window (I use 60 seconds), the second request gets the cached response instead of triggering a new LLM call. The TTL ensures the cache doesn&rsquo;t grow unbounded and that genuinely repeated questions (asked minutes apart) still get fresh answers.</p>
+
+        <h2>The technical names I didn&rsquo;t know</h2>
+
+        <p>After building all of this, the terminology became clear:</p>
+
+        <ul>
+          <li><strong>Resilience engineering</strong> &mdash; designing systems that handle failure gracefully rather than preventing all failures. Every pattern here assumes things <em>will</em> go wrong.</li>
+          <li><strong>Exponential backoff with jitter</strong> &mdash; literally textbook. AWS published the canonical article on this. I just applied it to LLM API calls.</li>
+          <li><strong>Circuit breaker</strong> &mdash; I don&rsquo;t implement a full circuit breaker, but the retryable-vs-terminal error classification is the same idea. Don&rsquo;t keep trying when the failure is permanent.</li>
+          <li><strong>Idempotency</strong> &mdash; ensuring that performing the same operation multiple times produces the same result. Standard in payment processing, distributed messaging, and now AI inference.</li>
+        </ul>
+
+        <p>None of this is new. It&rsquo;s all from distributed systems literature, just applied to a new kind of API call.</p>
+
+        <h2>What doesn&rsquo;t work</h2>
+
+        <ul>
+          <li><strong>Retries don&rsquo;t fix bad prompts.</strong> If the model genuinely can&rsquo;t handle your prompt &mdash; it&rsquo;s too long, too ambiguous, or asks for something it can&rsquo;t do &mdash; retrying with backoff just burns money. I had to learn to distinguish between transient failures (retry) and fundamental failures (rethink the prompt).</li>
+          <li><strong>Timeouts are hard to tune.</strong> 180 seconds for idle chunk timeout works for conversational responses. But batch processing with complex prompts can legitimately pause for 60+ seconds while the model &ldquo;thinks.&rdquo; I ended up making the idle timeout configurable per use case rather than a single global constant.</li>
+          <li><strong>Heartbeats don&rsquo;t survive all proxies.</strong> Some aggressive WAFs and corporate proxies buffer the entire response before forwarding. No amount of heartbeats help &mdash; the client sees nothing until the response is complete. The only fix is to document minimum proxy requirements for deployment.</li>
+          <li><strong>The enforcement retry is a blunt hammer.</strong> Asking the model to &ldquo;please return valid JSON this time&rdquo; works maybe 80% of the time. The other 20%, the model has a fundamental misunderstanding of the expected format. For those cases, you need the fallback.</li>
+        </ul>
+
+        <p>The meta-lesson is that reliability patterns don&rsquo;t make unreliable systems reliable. They make unreliable systems <em>manageable</em>. The AI still fails. The API still goes down. Streams still stall. But instead of waking you up at 3am, the system handles it, logs it, and moves on.</p>
+
+        <hr>
+
+        <nav class="post-nav">
+          <a href="/blog/">&larr; Back to blog</a>
+          <span class="post-nav-spacer"></span>
+        </nav>
+      </div>
+
+      <footer class="blog-footer">
+        <p>&copy; Adri&agrave; Cidre &middot; <a href="/">Home</a></p>
+      </footer>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
