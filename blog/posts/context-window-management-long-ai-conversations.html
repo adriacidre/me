@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your AI Forgot What You Said 30 Messages Ago &mdash; Adri&agrave; Cidre</title>
+  <meta name="description" content="Context windows fill up fast in long AI conversations. Sliding windows, progressive compression, and token budgeting &mdash; the patterns I built before I knew their names.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://adriacidre.com/blog/posts/context-window-management-long-ai-conversations.html">
+  <meta property="og:title" content="Your AI Forgot What You Said 30 Messages Ago">
+  <meta property="og:description" content="Context windows fill up fast in long AI conversations. Sliding windows, progressive compression, and token budgeting &mdash; the patterns I built before I knew their names.">
+  <meta property="og:image" content="https://adriacidre.com/blog/images/og-default.jpg">
+  <meta property="og:site_name" content="Adri&agrave; Cidre">
+  <meta property="article:published_time" content="2026-02-26">
+  <meta property="article:author" content="Adri&agrave; Cidre">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Your AI Forgot What You Said 30 Messages Ago">
+  <meta name="twitter:description" content="Context windows fill up fast in long AI conversations. Sliding windows, progressive compression, and token budgeting &mdash; the patterns I built before I knew their names.">
+  <meta name="twitter:image" content="https://adriacidre.com/blog/images/og-default.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;600&family=Source+Code+Pro:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="../css/blog.css">
+</head>
+<body>
+  <div class="blog-wrapper">
+    <div class="blog-card">
+      <header class="blog-header">
+        <div class="blog-header-name"><a href="/">Adri&agrave; Cidre</a></div>
+        <nav>
+          <ul class="blog-header-nav">
+            <li><a href="/">Home</a></li>
+            <li><a href="/blog/">Blog</a></li>
+          </ul>
+        </nav>
+      </header>
+
+      <div class="blog-content">
+        <div class="post-meta">
+          <span class="post-meta-date">February 26, 2026</span>
+          <div class="post-meta-tags">
+            <span class="post-meta-tag">context-window-management</span>
+            <span class="post-meta-tag">token-optimization</span>
+            <span class="post-meta-tag">long-context-ai</span>
+            <span class="post-meta-tag">memory-management</span>
+            <span class="post-meta-tag">llm-agents</span>
+            <span class="post-meta-tag">go</span>
+          </div>
+        </div>
+
+        <h1>Your AI Forgot What You Said 30 Messages Ago</h1>
+
+        <p>I was 50 messages into a conversation with an AI assistant when it asked me a question I&rsquo;d already answered &mdash; twice. Not a hallucination, not a misunderstanding. It had genuinely lost the information. The earlier messages had fallen out of the context window, and the AI was working with a partial picture of our conversation.</p>
+
+        <p>I didn&rsquo;t know the term &ldquo;context window management&rdquo; at the time. I just knew that long conversations broke things, and I needed to fix it.</p>
+
+        <h2>The naive approach: send everything</h2>
+
+        <p>The first implementation was obvious &mdash; just send the full conversation history with every request. It works until it doesn&rsquo;t.</p>
+
+        <p>The problems show up fast:</p>
+
+        <ul>
+          <li><strong>Token costs explode.</strong> Every message in the history gets billed on every request. A 50-message conversation means you&rsquo;re paying for all 50 messages each time.</li>
+          <li><strong>Latency spikes.</strong> More input tokens means slower responses. Users notice.</li>
+          <li><strong>The AI gets confused.</strong> Older context competes with newer context. The model gives weight to things that were discussed 40 messages ago and are no longer relevant, or contradicts decisions that were already settled.</li>
+        </ul>
+
+        <p>I needed a way to keep conversations long without keeping the context window bloated.</p>
+
+        <h2>Sliding window: keep what&rsquo;s recent</h2>
+
+        <p>The first real fix was a sliding window. Keep the opening message (system context with instructions and configuration) plus the last N messages. Everything in between gets dropped.</p>
+
+<pre><code class="language-go">const MaxMessageWindow = 10
+
+// TruncateHistory keeps the system message and the most recent
+// messages within the window limit.
+func TruncateHistory(messages []Message) []Message {
+    if len(messages) <= MaxMessageWindow+1 {
+        return messages
+    }
+
+    // Always keep the first message (system context)
+    result := make([]Message, 0, MaxMessageWindow+1)
+    result = append(result, messages[0])
+
+    // Keep the last N messages
+    start := len(messages) - MaxMessageWindow
+    result = append(result, messages[start:]...)
+
+    return result
+}</code></pre>
+
+        <p>This is simple and it works surprisingly well for most conversations. The system prompt stays anchored, and the AI always has the most recent exchanges. For short conversations, nothing gets dropped at all.</p>
+
+        <p>But there&rsquo;s a problem: knowledge disappears with the messages.</p>
+
+        <h2>The window drops messages, not knowledge</h2>
+
+        <p>In message 5, the user says &ldquo;I&rsquo;m working with the payments module.&rdquo; By message 20, that message has been dropped from the window. Now the AI doesn&rsquo;t know which module the user is working with. It asks again &mdash; or worse, it guesses wrong.</p>
+
+        <p>The window is the right approach for managing token count, but you need a separate mechanism for preserving the <em>knowledge</em> that accumulates during a conversation. I ended up building what I called &ldquo;accumulated notes&rdquo; &mdash; a structured document, organized by topic, that persists across the entire session regardless of which messages are still in the window.</p>
+
+<pre><code class="language-go">// AccumulatedNotes tracks knowledge extracted from the conversation,
+// organized by topic. This persists even as messages leave the window.
+type AccumulatedNotes struct {
+    Sections []NoteSection
+}
+
+type NoteSection struct {
+    Topic     string
+    Status    string   // "confirmed", "active", "superseded"
+    Points    []string
+    UpdatedAt int      // message index when last updated
+}
+
+// AddOrUpdate merges new information into the appropriate section.
+// If the topic exists, it appends new points. If not, it creates
+// a new section.
+func (n *AccumulatedNotes) AddOrUpdate(topic string, points []string, msgIndex int) {
+    for i, section := range n.Sections {
+        if section.Topic == topic {
+            n.Sections[i].Points = append(n.Sections[i].Points, points...)
+            n.Sections[i].Status = "active"
+            n.Sections[i].UpdatedAt = msgIndex
+            return
+        }
+    }
+    n.Sections = append(n.Sections, NoteSection{
+        Topic:     topic,
+        Status:    "active",
+        Points:    points,
+        UpdatedAt: msgIndex,
+    })
+}</code></pre>
+
+        <p>The AI extracts key facts and decisions from each exchange and files them into the notes. When an old message falls out of the sliding window, the knowledge it contained is already captured in the notes document. The notes get included in every prompt &mdash; after the system message but before the conversation window.</p>
+
+        <h2>Progressive compression: three tiers</h2>
+
+        <p>The notes themselves grow over time. In a long session with many topics, the accumulated notes can eat up a significant chunk of the token budget. So I added compression.</p>
+
+        <p>The idea is simple: not all knowledge needs the same level of detail. A topic that was discussed, decided, and hasn&rsquo;t come up in 20 messages doesn&rsquo;t need five bullet points. It needs one sentence.</p>
+
+<pre><code class="language-go">// CompressNotes reduces the token footprint of accumulated notes
+// by compressing confirmed topics to one-line summaries.
+func CompressNotes(notes *AccumulatedNotes, currentMsgIndex int) {
+    for i, section := range notes.Sections {
+        messagesSinceUpdate := currentMsgIndex - section.UpdatedAt
+
+        switch {
+        case section.Status == "confirmed" || messagesSinceUpdate > 20:
+            // Tier 1: Confirmed or stale topics get compressed
+            // to a single summary line.
+            summary := summarizePoints(section.Points)
+            notes.Sections[i].Points = []string{summary}
+            notes.Sections[i].Status = "confirmed"
+
+        case messagesSinceUpdate > 10:
+            // Tier 2: Aging topics keep their most recent points.
+            if len(section.Points) > 3 {
+                notes.Sections[i].Points = section.Points[len(section.Points)-3:]
+            }
+
+        default:
+            // Tier 3: Active topics keep full detail.
+        }
+    }
+}</code></pre>
+
+        <p>The three tiers:</p>
+
+        <ol>
+          <li><strong>Confirmed/stale topics</strong> &mdash; compressed to a one-line summary. This covers things like &ldquo;User is working on the payments module&rdquo; or &ldquo;Decided to use PostgreSQL for storage.&rdquo; These are settled facts. One sentence is enough. Savings: 70&ndash;80% of the original tokens.</li>
+          <li><strong>Aging topics</strong> &mdash; trimmed to the last 3 points. Still relevant, but the full history of the discussion isn&rsquo;t needed.</li>
+          <li><strong>Active topics</strong> &mdash; full detail. These are things being discussed right now. Don&rsquo;t touch them.</li>
+        </ol>
+
+        <h2>Token budgeting: don&rsquo;t blow the cap</h2>
+
+        <p>Even with compression, the notes can grow beyond what&rsquo;s comfortable. I set a hard token budget for the notes section and enforce it with boundary-aware truncation.</p>
+
+        <p>The key insight is that you can&rsquo;t just cut the notes at an arbitrary character count. If you cut in the middle of a section, the AI reads a topic header followed by an incomplete thought &mdash; worse than not including the topic at all.</p>
+
+<pre><code class="language-go">const MaxNotesTokens = 1500
+
+// TruncateNotes removes the oldest sections to fit within the
+// token budget, but never cuts mid-section.
+func TruncateNotes(notes *AccumulatedNotes, maxTokens int) *AccumulatedNotes {
+    totalTokens := 0
+    var kept []NoteSection
+
+    // Iterate from newest to oldest (most recently updated first)
+    sorted := sortByUpdateDesc(notes.Sections)
+
+    for _, section := range sorted {
+        sectionTokens := estimateTokens(section)
+        if totalTokens+sectionTokens > maxTokens {
+            continue // skip this section entirely
+        }
+        totalTokens += sectionTokens
+        kept = append(kept, section)
+    }
+
+    return &AccumulatedNotes{Sections: kept}
+}</code></pre>
+
+        <p>The truncation iterates from the most recently updated sections to the oldest. If a section doesn&rsquo;t fit within the remaining budget, it gets skipped entirely &mdash; no partial sections. This means the AI always sees complete, coherent topic summaries, even if some older topics are missing altogether.</p>
+
+        <h2>Putting it together</h2>
+
+        <p>The full prompt assembly looks like this:</p>
+
+<pre><code class="language-go">// BuildDynamicPrompt assembles the final prompt from all components,
+// respecting token budgets for each section.
+func BuildDynamicPrompt(
+    systemMsg Message,
+    notes *AccumulatedNotes,
+    history []Message,
+) []Message {
+    // 1. Compress notes based on recency and status
+    CompressNotes(notes, len(history))
+
+    // 2. Truncate notes to fit token budget
+    trimmedNotes := TruncateNotes(notes, MaxNotesTokens)
+
+    // 3. Sliding window on conversation history
+    recentHistory := TruncateHistory(history)
+
+    // 4. Assemble: system + notes + recent messages
+    prompt := make([]Message, 0)
+    prompt = append(prompt, systemMsg)
+    prompt = append(prompt, notesToMessage(trimmedNotes))
+    prompt = append(prompt, recentHistory[1:]...) // skip system msg (already added)
+
+    return prompt
+}</code></pre>
+
+        <p>The result is a prompt that stays under roughly 8K tokens for most conversations, regardless of how long the session runs. The system prompt anchors the behavior, the notes preserve accumulated knowledge, and the sliding window provides immediate conversational context.</p>
+
+        <h2>These patterns have names</h2>
+
+        <p>I built all of this from constraints &mdash; the context window was too small, conversations were too long, and I needed things to work. It was only later that I found the academic and industry terms for what I&rsquo;d built. If you want to go deeper, these are the keywords to search:</p>
+
+        <ul>
+          <li><strong>Sliding window attention</strong> &mdash; keeping a fixed-size window of recent context. Some transformer architectures use this internally at the attention layer. I applied the same idea at the application level, to the conversation history itself.</li>
+          <li><strong>Progressive summarization</strong> &mdash; reducing detail for older information while keeping recent information at full fidelity. Tiago Forte popularized the term for personal knowledge management. The three-tier compression I built is the same principle, applied to AI conversation memory.</li>
+          <li><strong>Token budgeting</strong> &mdash; allocating a fixed token budget to different prompt sections and enforcing hard caps. You&rsquo;ll find this in RAG systems, multi-agent architectures, and anywhere prompts are composed from multiple sources.</li>
+        </ul>
+
+        <p>The patterns emerged from the constraints, not from the literature. That&rsquo;s not a flex &mdash; it just means these problems are common enough that anyone working on long AI conversations will eventually arrive at the same solutions.</p>
+
+        <h2>What doesn&rsquo;t work</h2>
+
+        <p>I want to be honest about the gaps:</p>
+
+        <ul>
+          <li><strong>Long tangents get lost.</strong> If a topic spans many messages but never gets explicitly confirmed, the notes capture fragments but miss the arc. The compression is lossy &mdash; that&rsquo;s the point, but it means nuance gets flattened.</li>
+          <li><strong>Compressed notes lose tone.</strong> When the AI reads back a one-line summary of a 10-point discussion, it sometimes misses context that was implicit in the original exchange. &ldquo;Decided to use caching&rdquo; doesn&rsquo;t capture the three reasons <em>why</em> that decision was made.</li>
+          <li><strong>The window size is a tradeoff.</strong> 10 messages is enough for most interactions but too small for complex multi-step debugging. I&rsquo;ve experimented with dynamic window sizes, but the complexity wasn&rsquo;t worth the improvement.</li>
+          <li><strong>Token estimation is approximate.</strong> I use a simple character-based heuristic rather than a real tokenizer. It&rsquo;s close enough for budgeting but occasionally over- or under-shoots by 10&ndash;15%.</li>
+        </ul>
+
+        <h2>The numbers</h2>
+
+        <p>For a typical long session (50+ messages across multiple topics):</p>
+
+        <ul>
+          <li><strong>Raw notes:</strong> ~3000 tokens (all topics at full detail)</li>
+          <li><strong>After compression:</strong> 1000&ndash;1500 tokens (confirmed topics summarized, aging topics trimmed)</li>
+          <li><strong>Sliding window (10 messages):</strong> ~4000&ndash;5000 tokens</li>
+          <li><strong>System prompt:</strong> ~1500 tokens</li>
+          <li><strong>Total prompt size:</strong> ~7000&ndash;8000 tokens, regardless of conversation length</li>
+        </ul>
+
+        <p>Without these patterns, the same 50-message conversation would send 25K+ tokens per request &mdash; and the quality of the AI&rsquo;s responses would actually be worse because of the competing context problem.</p>
+
+        <p>The constraint forces discipline. A fixed budget means the system has to decide what matters, and it turns out that&rsquo;s exactly what you want.</p>
+
+        <hr>
+
+        <nav class="post-nav">
+          <a href="/blog/">&larr; Back to blog</a>
+          <span class="post-nav-spacer"></span>
+        </nav>
+      </div>
+
+      <footer class="blog-footer">
+        <p>&copy; Adri&agrave; Cidre &middot; <a href="/">Home</a></p>
+      </footer>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
