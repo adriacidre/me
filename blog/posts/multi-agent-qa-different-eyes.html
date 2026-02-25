@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>8 Specialists Looking at the Same Screen &mdash; Adri&agrave; Cidre</title>
+  <meta name="description" content="One AI agent testing your app finds surface bugs. Eight agents looking at the same screen from different angles find the bugs that actually matter.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://adriacidre.com/blog/posts/multi-agent-qa-different-eyes.html">
+  <meta property="og:title" content="8 Specialists Looking at the Same Screen">
+  <meta property="og:description" content="One AI agent testing your app finds surface bugs. Eight agents looking at the same screen from different angles find the bugs that actually matter.">
+  <meta property="og:image" content="https://adriacidre.com/blog/images/og-default.jpg">
+  <meta property="og:site_name" content="Adri&agrave; Cidre">
+  <meta property="article:published_time" content="2026-03-26">
+  <meta property="article:author" content="Adri&agrave; Cidre">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="8 Specialists Looking at the Same Screen">
+  <meta name="twitter:description" content="One AI agent testing your app finds surface bugs. Eight agents looking at the same screen from different angles find the bugs that actually matter.">
+  <meta name="twitter:image" content="https://adriacidre.com/blog/images/og-default.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;600&family=Source+Code+Pro:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <link rel="stylesheet" href="../css/blog.css">
+</head>
+<body>
+  <div class="blog-wrapper">
+    <div class="blog-card">
+      <header class="blog-header">
+        <div class="blog-header-name"><a href="/">Adri&agrave; Cidre</a></div>
+        <nav>
+          <ul class="blog-header-nav">
+            <li><a href="/">Home</a></li>
+            <li><a href="/blog/">Blog</a></li>
+          </ul>
+        </nav>
+      </header>
+
+      <div class="blog-content">
+        <div class="post-meta">
+          <span class="post-meta-date">March 26, 2026</span>
+          <div class="post-meta-tags">
+            <span class="post-meta-tag">multi-agent-evaluation</span>
+            <span class="post-meta-tag">ai-quality-assurance</span>
+            <span class="post-meta-tag">llm-output-monitoring</span>
+            <span class="post-meta-tag">automated-regression-testing</span>
+            <span class="post-meta-tag">hallucination-detection</span>
+            <span class="post-meta-tag">playwright</span>
+          </div>
+        </div>
+
+        <h1>8 Specialists Looking at the Same Screen</h1>
+
+        <p>One AI agent testing your app finds surface bugs. A button that doesn&rsquo;t work, a page that doesn&rsquo;t load, a form that doesn&rsquo;t submit. Useful, but shallow. The bugs that actually ship to production are the ones a single generalist doesn&rsquo;t notice &mdash; a security issue in the auth flow, a UX pattern that confuses users, a data leak between tenants, a performance regression that only shows up under load.</p>
+
+        <p>I needed multiple perspectives looking at the same page. Not sequentially &mdash; simultaneously. Each one trained to look for a different class of problem.</p>
+
+        <h2>The specialist model</h2>
+
+        <p>Eight parallel evaluators, each with its own checklist and severity taxonomy. They all receive the same input &mdash; a screenshot of the current page state, the page URL, console logs, network requests &mdash; and each one looks for problems through a different lens.</p>
+
+<pre><code class="language-plaintext">┌──────────────────────────────────────────────┐
+│              Page State Snapshot              │
+│  (screenshot + URL + console + network logs) │
+└──────────────┬───────────────────────────────┘
+               │
+    ┌──────────┼──────────┐
+    │          │          │
+    v          v          v          ...
+┌──────┐  ┌──────┐  ┌──────┐
+│  QA  │  │  UX  │  │  UI  │  Security, Performance,
+│      │  │      │  │      │  Data Leakage, Language,
+│      │  │      │  │      │  Explorer
+└──┬───┘  └──┬───┘  └──┬───┘
+   │         │         │
+   v         v         v
+┌──────────────────────────────────────────────┐
+│         Merged &amp; Deduplicated Findings       │
+└──────────────────────────────────────────────┘</code></pre>
+
+        <p>The eight specialists:</p>
+
+        <ol>
+          <li><strong>QA (Functional)</strong> &mdash; Does the page work? Do buttons do what they say? Do forms validate inputs? Are error states handled? This is the traditional tester.</li>
+          <li><strong>UX (User Experience)</strong> &mdash; Is the flow intuitive? Are labels clear? Is the navigation logical? Would a new user know what to do? This catches &ldquo;technically correct but confusing&rdquo; patterns.</li>
+          <li><strong>UI (Visual)</strong> &mdash; Alignment, spacing, typography, color contrast, responsive behavior. The pixel-level stuff that accumulates into &ldquo;this app feels rough.&rdquo;</li>
+          <li><strong>Security</strong> &mdash; Exposed tokens in network requests, missing auth checks, XSS vectors in user input, insecure HTTP calls, permission escalation paths.</li>
+          <li><strong>Performance</strong> &mdash; Large payloads in network responses, excessive API calls, slow-loading resources, unoptimized images, render-blocking scripts.</li>
+          <li><strong>Data Leakage</strong> &mdash; Cross-tenant data visibility, PII in console logs, sensitive data in URLs, cached credentials in local storage.</li>
+          <li><strong>Language</strong> &mdash; Spelling, grammar, tone consistency, untranslated strings, placeholder text that shipped to production.</li>
+          <li><strong>Explorer</strong> &mdash; The wildcard. This one actively interacts with the page rather than just observing.</li>
+        </ol>
+
+        <h2>Severity classification</h2>
+
+        <p>Each specialist reports findings using a shared severity taxonomy. This is critical &mdash; without consistent severity levels, you can&rsquo;t triage findings from eight different sources.</p>
+
+<pre><code class="language-go">type Severity string
+
+const (
+    SeverityBlocker Severity = "BLOCKER" // Fix before any release
+    SeverityBug     Severity = "BUG"     // Fix before next release
+    SeverityWarning Severity = "WARNING" // Fix when convenient
+    SeverityOK      Severity = "OK"      // Checked, no issues
+)
+
+type Finding struct {
+    Specialist  string   `json:"specialist"`
+    Severity    Severity `json:"severity"`
+    Code        string   `json:"code"`     // e.g., "SEC-001", "UX-003"
+    Title       string   `json:"title"`
+    Description string   `json:"description"`
+    Evidence    string   `json:"evidence"` // screenshot region, log line, etc.
+    PageURL     string   `json:"page_url"`
+}</code></pre>
+
+        <p>Each finding gets a specialist-prefixed code: <code>SEC-001</code> for the first security finding, <code>UX-003</code> for the third UX finding. This makes triage fast &mdash; you can filter by specialist, sort by severity, and see at a glance which categories are producing the most issues.</p>
+
+        <p>The triage guide:</p>
+
+        <ul>
+          <li><strong>BLOCKER</strong> &mdash; the page is broken, data is leaking, or security is compromised. Fix now. These create high-priority issues immediately.</li>
+          <li><strong>BUG</strong> &mdash; something is wrong but not critical. Fix before the next release. These create normal-priority issues.</li>
+          <li><strong>WARNING</strong> &mdash; something could be better. Fix when convenient. These create low-priority issues or get added to a &ldquo;polish&rdquo; backlog.</li>
+        </ul>
+
+        <h2>The Explorer: the destructive tester</h2>
+
+        <p>Seven of the eight specialists are observers &mdash; they look at the page state and report what they see. The Explorer is different. It has direct browser control through Playwright and actively probes the application.</p>
+
+<pre><code class="language-go">// ExplorerProbes defines the categories of active testing the
+// Explorer specialist performs. Each probe type has constraints
+// to prevent state corruption.
+type ExplorerProbes struct {
+    // Authorization: try accessing resources that should be restricted
+    AuthorizationProbes []AuthProbe
+
+    // Navigation: click unexpected links, use browser back/forward,
+    // bookmark deep links, open in new tabs
+    NavigationChaos []NavProbe
+
+    // Boundaries: empty inputs, maximum-length strings, special
+    // characters, rapid repeated submissions
+    BoundaryStates []BoundaryProbe
+
+    // Console/Network: check for errors, failed requests, warnings
+    HealthChecks []HealthProbe
+
+    // Destructive: delete actions, cancel mid-flow, close modals
+    // during submission. ONLY run at end of journey to avoid
+    // corrupting state for other specialists.
+    DestructiveProbes []DestructiveProbe
+}</code></pre>
+
+        <p>The Explorer is the only specialist that can <em>break things</em>. It tries to access pages it shouldn&rsquo;t, submits forms with garbage data, clicks buttons in unexpected orders, and probes authorization boundaries. This is where you find the bugs that no observer would catch &mdash; because they only appear when someone actively tries to misuse the system.</p>
+
+        <p>The critical constraint: destructive probes run last, at the end of the user journey. If the Explorer starts deleting records on page 2 of a 5-page journey, the other seven specialists are evaluating a broken state. The ordering matters.</p>
+
+        <h2>Parallel execution</h2>
+
+        <p>All eight specialists run against the same page snapshot simultaneously. This is a key design choice &mdash; they don&rsquo;t take turns, they all evaluate the same state at the same time.</p>
+
+<pre><code class="language-go">// EvaluatePage runs all specialists in parallel against the same
+// page state and returns merged, deduplicated findings.
+func EvaluatePage(ctx context.Context, state PageState, specialists []Specialist) ([]Finding, error) {
+    var (
+        mu       sync.Mutex
+        findings []Finding
+        g        errgroup.Group
+    )
+
+    for _, spec := range specialists {
+        spec := spec // capture loop variable
+        g.Go(func() error {
+            results, err := spec.Evaluate(ctx, state)
+            if err != nil {
+                // Log but don't fail the whole evaluation
+                log.Printf("specialist %s failed: %v", spec.Name(), err)
+                return nil
+            }
+
+            mu.Lock()
+            findings = append(findings, results...)
+            mu.Unlock()
+            return nil
+        })
+    }
+
+    if err := g.Wait(); err != nil {
+        return nil, err
+    }
+
+    // Deduplicate findings that multiple specialists reported
+    return deduplicateFindings(findings), nil
+}</code></pre>
+
+        <p>Parallel execution has two benefits: it&rsquo;s faster (8 specialists take roughly the same time as 1), and it ensures they all see identical state. If they ran sequentially, user actions between evaluations could change the page.</p>
+
+        <p>One specialist failing doesn&rsquo;t fail the whole evaluation. If the Security specialist times out, you still get findings from the other seven. The failed specialist gets logged and the evaluation continues.</p>
+
+        <h2>Automated triage</h2>
+
+        <p>Eight specialists producing findings per page, across multiple pages in a user journey, generates a lot of data. The triage step turns raw findings into actionable work items.</p>
+
+<pre><code class="language-go">// TriageFindings converts deduplicated findings into categorized
+// work items, grouped by complexity for efficient processing.
+func TriageFindings(findings []Finding) *TriageReport {
+    report := &TriageReport{
+        CreatedAt: time.Now(),
+    }
+
+    for _, f := range findings {
+        if f.Severity == SeverityOK {
+            continue
+        }
+
+        item := WorkItem{
+            Title:       fmt.Sprintf("[%s] %s: %s", f.Severity, f.Code, f.Title),
+            Description: f.Description,
+            Evidence:    f.Evidence,
+            Source:      f.Specialist,
+            PageURL:     f.PageURL,
+        }
+
+        switch f.Severity {
+        case SeverityBlocker:
+            item.Priority = PriorityCritical
+            report.Blockers = append(report.Blockers, item)
+        case SeverityBug:
+            item.Priority = PriorityHigh
+            report.Bugs = append(report.Bugs, item)
+        case SeverityWarning:
+            item.Priority = PriorityLow
+            report.Warnings = append(report.Warnings, item)
+        }
+    }
+
+    return report
+}</code></pre>
+
+        <p>Blockers become critical-priority issues. Bugs become high-priority issues. Warnings go into a polish backlog. Each work item includes the evidence (screenshot region, log line, network request) so the developer &mdash; or the AI in the next batch run &mdash; can reproduce and fix the issue without re-running the QA.</p>
+
+        <h2>The technical names I didn&rsquo;t know</h2>
+
+        <ul>
+          <li><strong>Multi-agent evaluation</strong> &mdash; using multiple AI agents with different specializations to evaluate the same artifact. The machine learning community uses this for model output evaluation; I&rsquo;m using it for application QA.</li>
+          <li><strong>Ensemble testing</strong> &mdash; combining results from multiple independent testers to get higher coverage than any single tester. Same principle as ensemble methods in ML &mdash; diverse perspectives catch more issues.</li>
+          <li><strong>Adversarial testing</strong> &mdash; the Explorer specialist is doing adversarial testing. Deliberately trying to break the system, probe authorization boundaries, and trigger unexpected states. This is standard in security testing &mdash; I just automated it with an AI agent.</li>
+        </ul>
+
+        <h2>What doesn&rsquo;t work</h2>
+
+        <ul>
+          <li><strong>Specialists sometimes disagree.</strong> The UX specialist says a confirmation dialog is good practice. The Performance specialist flags it as an unnecessary interaction that slows the user down. Both are right, depending on your priorities. The triage step can&rsquo;t resolve subjective disagreements &mdash; those still need human judgment.</li>
+          <li><strong>The Explorer can break state.</strong> Even with the &ldquo;destructive probes last&rdquo; constraint, the Explorer sometimes changes state in ways that affect the next page in the journey. I&rsquo;ve had to add state checkpoints &mdash; snapshot the application state before Explorer probes and restore it after.</li>
+          <li><strong>False positives in security and performance.</strong> The Security specialist is paranoid by design. It flags things like &ldquo;API key visible in network request&rdquo; when it&rsquo;s actually a public API key meant to be visible. The Performance specialist flags image sizes that are within acceptable limits. These false positives erode trust in the findings, so I&rsquo;ve had to tune each specialist&rsquo;s thresholds over time.</li>
+          <li><strong>Deduplication is imperfect.</strong> When the QA specialist and the UX specialist both report that a button doesn&rsquo;t work, the descriptions are different enough that simple deduplication misses the overlap. I use semantic similarity (same technique as the <a href="semantic-cache-sub-10ms-ai-responses.html">semantic cache</a>) for deduplication, but it still misses some duplicates and occasionally merges distinct issues.</li>
+          <li><strong>Cost scales with pages.</strong> Eight specialist evaluations per page, across a 20-page user journey, means 160 AI calls per QA run. At that scale, model routing (cheaper models for simpler specialists like Language and UI) becomes important for cost control.</li>
+        </ul>
+
+        <hr>
+
+        <nav class="post-nav">
+          <a href="/blog/">&larr; Back to blog</a>
+          <span class="post-nav-spacer"></span>
+        </nav>
+      </div>
+
+      <footer class="blog-footer">
+        <p>&copy; Adri&agrave; Cidre &middot; <a href="/">Home</a></p>
+      </footer>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>
