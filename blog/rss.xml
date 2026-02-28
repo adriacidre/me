@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Adrià Cidre - Blog</title>
+    <link>https://adriacidre.com/blog/</link>
+    <description>Writing about AI-assisted development, Claude Code workflows, and building software with AI.</description>
+    <language>en</language>
+    <lastBuildDate>Tue, 04 Mar 2026 00:00:00 +0000</lastBuildDate>
+    <atom:link href="https://adriacidre.com/blog/rss.xml" rel="self" type="application/rss+xml"/>
+
+    <item>
+      <title>/work-issue: Autonomous Implementation</title>
+      <link>https://adriacidre.com/blog/posts/work-issue-autonomous-implementation.html</link>
+      <guid>https://adriacidre.com/blog/posts/work-issue-autonomous-implementation.html</guid>
+      <pubDate>Tue, 04 Mar 2026 00:00:00 +0000</pubDate>
+      <description>The AI picks up a planned issue, implements it, tests it, commits, and marks it done. How headless batch mode lets me plan in the afternoon and wake up with code in the morning.</description>
+    </item>
+
+    <item>
+      <title>Your AI Forgot What You Said 30 Messages Ago</title>
+      <link>https://adriacidre.com/blog/posts/context-window-management-long-ai-conversations.html</link>
+      <guid>https://adriacidre.com/blog/posts/context-window-management-long-ai-conversations.html</guid>
+      <pubDate>Wed, 26 Feb 2026 00:00:00 +0000</pubDate>
+      <description>Context windows fill up fast in long AI conversations. Sliding windows, progressive compression, and token budgeting — the patterns I built before I knew their names.</description>
+    </item>
+
+    <item>
+      <title>/plan-issue: Collaborative Planning with AI</title>
+      <link>https://adriacidre.com/blog/posts/plan-issue-collaborative-planning.html</link>
+      <guid>https://adriacidre.com/blog/posts/plan-issue-collaborative-planning.html</guid>
+      <pubDate>Tue, 25 Feb 2026 00:00:00 +0000</pubDate>
+      <description>Vague instructions produce vague implementations. How I sit with the AI to refine rough ideas into concrete, implementable specs — before any code gets written.</description>
+    </item>
+
+    <item>
+      <title>AI-Assisted Development: A Loop, Not a Chat</title>
+      <link>https://adriacidre.com/blog/posts/ai-assisted-development-loop-not-chat.html</link>
+      <guid>https://adriacidre.com/blog/posts/ai-assisted-development-loop-not-chat.html</guid>
+      <pubDate>Tue, 18 Feb 2026 00:00:00 +0000</pubDate>
+      <description>The bottleneck isn't the AI — it's me. Three slash commands that form a loop: Plan, Work, QA. How structured phases replaced ad-hoc chatting and made AI development manageable.</description>
+    </item>
+
+  </channel>
+</rss>
