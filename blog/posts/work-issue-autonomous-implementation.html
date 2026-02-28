@@ -175,10 +175,10 @@ Co-Authored-By: Claude Opus 4.6 &lt;noreply@anthropic.com&gt;
 
         <p>The batch orchestrator is a shell script that processes multiple issues one after the other. Each issue gets its own headless <code>claude -p</code> call &mdash; fresh context, no leftover state from the previous issue:</p>
 
-<pre><code class="language-bash">./scripts/work-linear-issues.sh -n 10 --stop-on-error
+<pre><code class="language-bash">./scripts/work-linear-issues.sh -n 50 --stop-on-error
 </code></pre>
 
-        <p>I usually kick this off in the evening with 8-10 planned issues in Linear. Takes a few hours to go through them &mdash; each issue runs for 2-5 minutes depending on how big it is. By morning, most of them are done.</p>
+        <p>I usually kick this off in the evening with 40-50 planned issues in Linear. Takes a few hours to go through them &mdash; each issue runs for 2-5 minutes depending on how big it is. By morning, they're done.</p>
 
         <p>What the script does:</p>
 
@@ -262,7 +262,7 @@ brot: Completed PROJ-42 — Add review notifications</code></pre>
 
         <p>(PROJ-41 failed silently &mdash; no notification &mdash; which is itself a signal to go check the logs.)</p>
 
-        <p>This matters more than I expected. When the batch runs overnight, waking up to 6-7 notifications means stuff got done while I slept. No notification for an issue means something went wrong &mdash; time to check the logs and re-plan. Simple, but it makes the whole overnight thing feel way less like a black box.</p>
+        <p>This matters more than I expected. When the batch runs overnight, waking up to 30-40 notifications means stuff got done while I slept. No notification for an issue means something went wrong &mdash; time to check the logs and re-plan. Simple, but it makes the whole overnight thing feel way less like a black box.</p>
 
         <h2>Guardrails I learned to add the hard way</h2>
 
