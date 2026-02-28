@@ -79,9 +79,9 @@
         <h3>1. Pick an issue</h3>
 
 <pre><code class="language-bash">/work-issue                          # Auto-pick oldest Todo issue
-/work-issue --id=BROT-42             # Specific issue
+/work-issue --id=PROJ-42             # Specific issue
 /work-issue --git=pr                 # Auto-pick, create a PR
-/work-issue --id=BROT-42 --git=pr   # Specific issue, create a PR
+/work-issue --id=PROJ-42 --git=pr   # Specific issue, create a PR
 </code></pre>
 
         <p>Auto-pick grabs the oldest issue in <strong>Todo</strong> &mdash; which is the queue that <code>/plan-issue</code> populates. This means issues get processed in the order they were planned.</p>
@@ -98,7 +98,7 @@
 
         <ul>
           <li><strong><code>main</code></strong> (default) &mdash; work directly on main. Good for small, well-planned changes.</li>
-          <li><strong><code>branch</code></strong> &mdash; create <code>issue/brot-42-add-notifications</code> feature branch. Good for larger changes you want to review before merging.</li>
+          <li><strong><code>branch</code></strong> &mdash; create <code>issue/proj-42-add-notifications</code> feature branch. Good for larger changes you want to review before merging.</li>
           <li><strong><code>pr</code></strong> &mdash; create branch + push + open a GitHub PR. Good for team workflows.</li>
         </ul>
 
@@ -143,13 +143,13 @@ make check         # fmt + vet + lint + tests
           <li>Naming inconsistencies</li>
         </ul>
 
-        <p>This catches a surprising amount of things. AI is good at following checklists.</p>
+        <p>This catches a surprising amount of things. AI is good at following checklists. For example, on PROJ-38 (the login redirect fix), the self-review caught a hardcoded API endpoint that should have been environment-based. The AI fixed it before committing &mdash; changed <code>/api/v1/auth</code> to <code>process.env.API_BASE_URL + '/auth'</code>. Small catch, but the kind of thing that would've broken in staging.</p>
 
         <h3>10-11. Commit and push</h3>
 
         <p>Only files relevant to the issue get staged &mdash; never <code>git add -A</code>. The commit message follows a consistent format:</p>
 
-<pre><code class="language-plaintext">BROT-42: Add review deadline notifications
+<pre><code class="language-plaintext">PROJ-42: Add review deadline notifications
 
 - Add notification_preferences table and migration
 - Implement daily cron job for deadline checking
@@ -166,7 +166,7 @@ Co-Authored-By: Claude Opus 4.6 &lt;noreply@anthropic.com&gt;
 
         <h3>13. Notify</h3>
 
-<pre><code class="language-bash">curl -d "brot: Completed BROT-42 — Add review deadline notifications" "$NTFY_URL"
+<pre><code class="language-bash">curl -d "brot: Completed PROJ-42 — Add review deadline notifications" "$NTFY_URL"
 </code></pre>
 
         <p>This sends a push notification via <a href="https://ntfy.sh">ntfy</a> to my phone. When I&rsquo;m running batch mode and doing something else entirely, I get a ping for each completed issue. It&rsquo;s the &ldquo;ding&rdquo; that lets me know work is happening in the background.</p>
@@ -197,41 +197,30 @@ Co-Authored-By: Claude Opus 4.6 &lt;noreply@anthropic.com&gt;
 │  Stop on error: false                       │
 ╰─────────────────────────────────────────────╯
 
-  ● BROT-38 (High) Fix login redirect loop [opus]
-  ✓ BROT-38: Fix login redirect loop (3m 42s)
+  ● PROJ-38 (High) Fix login redirect loop [opus]
+  ✓ PROJ-38: Fix login redirect loop (3m 42s)
     Files (3):
       internal/api/auth.go
       web/src/hooks/useAuth.ts
       web/src/components/LoginForm.test.tsx
-    Commit: a1b2c3d BROT-38: Fix login redirect loop
+    Commit: a1b2c3d PROJ-38: Fix login redirect loop
 
-  ● BROT-39 (Medium) Add empty state to library [sonnet]
-  ✓ BROT-39: Add empty state to library (1m 15s)
+  ● PROJ-39 (Medium) Add empty state to library [sonnet]
+  ✓ PROJ-39: Add empty state to library (1m 15s)
     ...
 
 ╭─────────────────────────────────────────────╮
 │  Summary                                     │
 ├─────────────────────────────────────────────┤
-│  ✓ BROT-38  Fix login redirect loop   3m42s │
-│  ✓ BROT-39  Add empty state to lib    1m15s │
-│  ✓ BROT-40  Update review badges      2m03s │
-│  ✗ BROT-41  Refactor calendar view    5m00s │
-│  ✓ BROT-42  Add notifications         4m22s │
+│  ✓ PROJ-38  Fix login redirect loop   3m42s │
+│  ✓ PROJ-39  Add empty state to lib    1m15s │
+│  ✓ PROJ-40  Update review badges      2m03s │
+│  ✗ PROJ-41  Refactor calendar view    5m00s │
+│  ✓ PROJ-42  Add notifications         4m22s │
 ├─────────────────────────────────────────────┤
 │  Completed: 4    Failed: 1    Total: 5      │
 │  Elapsed: 16m 22s                           │
 ╰─────────────────────────────────────────────╯</code></pre>
-
-        <h3>Picking the model automatically</h3>
-
-        <p>The <code>--model auto</code> flag (default) picks the model based on issue priority:</p>
-
-        <ul>
-          <li><strong>Urgent/High priority</strong> &rarr; Opus (smarter, slower, costs more)</li>
-          <li><strong>Medium/Low priority</strong> &rarr; Sonnet (fast, cheap, good enough for most things)</li>
-        </ul>
-
-        <p>Most well-planned issues don&rsquo;t need the biggest model. No point spending money on Opus for a one-file bug fix.</p>
 
         <h3>Fresh context per issue</h3>
 
@@ -261,17 +250,17 @@ Co-Authored-By: Claude Opus 4.6 &lt;noreply@anthropic.com&gt;
 
         <p>Both <code>/plan-issue</code> and <code>/work-issue</code> send push notifications via <a href="https://ntfy.sh">ntfy</a> when they complete. My global Claude Code config (<code>~/.claude/CLAUDE.md</code>) defines the pattern:</p>
 
-<pre><code class="language-bash">curl -d "brot: Completed BROT-42 — Add review deadline notifications" "$NTFY_URL"
+<pre><code class="language-bash">curl -d "brot: Completed PROJ-42 — Add review deadline notifications" "$NTFY_URL"
 </code></pre>
 
         <p>In practice, when I kick off a batch in the evening, I wake up to a trail of notifications:</p>
 
-<pre><code class="language-plaintext">brot: Completed BROT-38 — Fix login redirect loop
-brot: Completed BROT-39 — Add empty state to library
-brot: Completed BROT-40 — Update review status badges
-brot: Completed BROT-42 — Add review notifications</code></pre>
+<pre><code class="language-plaintext">brot: Completed PROJ-38 — Fix login redirect loop
+brot: Completed PROJ-39 — Add empty state to library
+brot: Completed PROJ-40 — Update review status badges
+brot: Completed PROJ-42 — Add review notifications</code></pre>
 
-        <p>(BROT-41 failed silently &mdash; no notification &mdash; which is itself a signal to go check the logs.)</p>
+        <p>(PROJ-41 failed silently &mdash; no notification &mdash; which is itself a signal to go check the logs.)</p>
 
         <p>This matters more than I expected. When the batch runs overnight, waking up to 6-7 notifications means stuff got done while I slept. No notification for an issue means something went wrong &mdash; time to check the logs and re-plan. Simple, but it makes the whole overnight thing feel way less like a black box.</p>
 
