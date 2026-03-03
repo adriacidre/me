@@ -60,7 +60,7 @@
 
         <p>The first thing everyone tries is hashing the question and looking it up in a key-value store. If the hash matches, return the cached answer. Simple, fast, and almost completely useless.</p>
 
-        <p>Real users don&rsquo;t ask questions the same way twice. &ldquo;How do I request PTO?&rdquo;, &ldquo;Where do I submit a vacation request?&rdquo;, &ldquo;Time off &mdash; how?&rdquo; &mdash; all the same question, zero cache hits. I measured the hit rate on exact-match caching against real traffic: under 3%. Not worth the code.</p>
+        <p>Real users don&rsquo;t ask questions the same way twice. &ldquo;How do I request PTO?&rdquo;, &ldquo;Where do I submit a vacation request?&rdquo;, &ldquo;Time off &mdash; how?&rdquo; &mdash; all the same question, zero cache hits. I measured the hit rate on exact-match caching against a representative test set: under 3%. Not worth the code.</p>
 
         <h2>Embedding the question</h2>
 
@@ -113,11 +113,11 @@ func LookupSemanticCache(
           <li><strong>Too high (more strict)</strong> &mdash; the cache almost never hits. You&rsquo;re paying for embeddings on every question but rarely getting the benefit.</li>
         </ul>
 
-        <p>I arrived at 0.85 by logging every cache lookup for two weeks &mdash; the question, the nearest match, the similarity score, and whether the cached answer was actually correct for the new question. 0.85 gave me a false-positive rate under 2% with a cache hit rate around 35% of all incoming questions.</p>
+        <p>I arrived at 0.85 by logging every cache lookup during two weeks of testing &mdash; the question, the nearest match, the similarity score, and whether the cached answer was actually correct for the new question. 0.85 gave me a false-positive rate under 2% with a cache hit rate around 35% across the test dataset.</p>
 
 <pre><code class="language-go">const (
     // SimilarityThreshold is the minimum cosine similarity required
-    // for a cache hit. Tuned against production traffic to balance
+    // for a cache hit. Tuned against test data to balance
     // hit rate (~35%) against false positives (<2%).
     SimilarityThreshold = 0.85
 )</code></pre>
@@ -256,7 +256,7 @@ Search cache (pgvector HNSW, ~5ms)
           <li>One prompt construction step</li>
         </ul>
 
-        <p>At a 35% hit rate across all incoming questions, that&rsquo;s roughly a third of your LLM costs eliminated. The embedding cost for the cache lookup is a rounding error compared to the LLM call it replaces. And the user experience improvement is dramatic &mdash; going from a 2-second response to a sub-100ms response for over a third of questions makes the system feel qualitatively different.</p>
+        <p>At the 35% hit rate I saw across the test dataset, that&rsquo;s roughly a third of LLM costs eliminated. The embedding cost for the cache lookup is a rounding error compared to the LLM call it replaces. And the difference in response time is dramatic &mdash; going from a 2-second response to a sub-100ms response for over a third of questions makes the system feel qualitatively different.</p>
 
         <p>The cache pays for itself almost immediately. The pgvector index, the storage, the embedding calls for lookups &mdash; all of it combined costs less than the LLM calls you&rsquo;re avoiding.</p>
 
